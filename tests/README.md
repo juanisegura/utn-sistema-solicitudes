@@ -1,6 +1,6 @@
 # Tests (`tests/`)
 
-Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). La forma oficial de correr todo es **`bash tests/run-all.sh`** (sección "Corrida completa: run-all.sh" al final); no hay CI en GitHub (D-51).
+Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). Estado final: **102 unitarios, 11 de integración y 84 casos smoke**, en verde (la corrida oficial registrada en `doc/pruebas/PRUEBAS.md`) (`doc/pruebas/PRUEBAS.md`). La forma oficial de correr todo es **`bash tests/run-all.sh`** (sección "Corrida completa: run-all.sh" al final); no hay CI en GitHub (D-51).
 
 # Smoke HTTP (`tests/smoke.sh`)
 
@@ -232,18 +232,18 @@ BASE_URL=http://localhost:8080 php tests/integration/run.php
 
 | Archivo | Unidad | Qué verifica |
 |---|---|---|
-| `unit/ValidatorTest.php` | `Validator` | UTF-8 inválido, recorte Unicode (NBSP, ZWSP, BOM, U+3000), controles, CR/LF en una línea, multiline, `max` en caracteres, email, regla desconocida; recorte lineal con `pcre.jit=0` (hallazgo A2-08, falla hasta el fix) |
-| `unit/EstadoTest.php` | `Estado` | `fromInput` (válidos, null/vacío, trim, fuera de lista), coincidencia con el ENUM de `schema.sql` |
-| `unit/RouterTest.php` | `Router` | `{id}` con `$D` y `[1-9][0-9]{0,9}`, escape del patrón, `Allow` + HEAD; dispatch 404/405/HEAD/`{id}` int; **M-5**: 404/405 sin sesión, acción con sesión activa |
-| `unit/CsrfTest.php` | `Csrf` | `verify` con null, vacío, otro token, prefijo/sufijo, guardado no-string, array (TypeError); `rotate`; formato de `token()` |
-| `unit/ResponseTest.php` | `Response::redirect` | 15 destinos rechazados (esquema, `//`, `/\`, CR/LF, NUL, TAB, DEL); local → 302 y termina |
-| `unit/AdminTest.php` | `Admin` | `normalizeEmail` (multibyte, idempotente, sin quitar acentos — D-41), `passwordAcceptable` (72 bytes, NUL), bcrypt costo 12 fijo y hash ficticio igual (D-35, D-37) |
-| `unit/RequestIpTest.php` | `Request::ip` (M-1) | sin proxies, proxy confiable, XFF falsificado, derecha a izquierda, cadena, CIDR v4/v6, huecos (a)–(d) de D-49 |
-| `unit/LogTest.php` | `Log` (M-6) | "supera" estricto, rotación antes de escribir, corrimiento y descarte, tope de archivos, 2 procesos concurrentes sin líneas perdidas/mezcladas; una rotación que falla no hace lanzar a `write` (hallazgo A2-08, falla hasta el fix) |
-| `unit/SessionTimeoutTest.php` | `Session` (**M-8**) | antes/después de vencer (manipulando `_last_activity`), ID nuevo y sesión vieja borrada, ventana deslizante, tiempo real 1 s, `gc_maxlifetime ≥ timeout` |
-| `unit/LikeEscapeTest.php` | escape de LIKE (M-3) | `%`, `_`, `\` (la barra primero), multibyte; PENDIENTE si la función no existe |
-| `integration/LoginAtomicidadTest.php` | límite (M-1, D-46) | 4 fallos + ráfaga de 8 simultáneos → ≤ 1 verificado (401) y filas = previas + verificados ≤ 5; CSRF inválido no reserva; éxito no deja fila |
-| `integration/HistorialTransaccionTest.php` | historial (M-2) | alta sin evento, evento con anterior/nuevo/admin, no-op sin evento, 422/404 sin evento, cambios simultáneos encadenados, FK CASCADE/RESTRICT, vista; PENDIENTE sin la tabla |
+| `unit/ValidatorTest.php` (19) | `Validator` | UTF-8 inválido, recorte Unicode (NBSP, ZWSP, BOM, U+3000), controles, CR/LF y TAB en una línea (D-50), multiline, `max` en caracteres, email, regla desconocida; recorte lineal con `pcre.jit=0` (regresión del hallazgo de A2-08) |
+| `unit/EstadoTest.php` (6) | `Estado` | `fromInput` (válidos, null/vacío, trim, fuera de lista), coincidencia con el ENUM de `schema.sql` |
+| `unit/RouterTest.php` (14) | `Router` | `{id}` con `$D` y `[1-9][0-9]{0,9}`, escape del patrón, `Allow` + HEAD; dispatch 404/405/HEAD/`{id}` int; **M-5**: 404/405 sin sesión, acción con sesión activa |
+| `unit/CsrfTest.php` (8) | `Csrf` | `verify` con null, vacío, otro token, prefijo/sufijo, guardado no-string, array (TypeError); `rotate`; formato de `token()` |
+| `unit/ResponseTest.php` (3) | `Response::redirect` | 15 destinos rechazados (esquema, `//`, `/\`, CR/LF, NUL, TAB, DEL); local → 302 y termina |
+| `unit/AdminTest.php` (10) | `Admin` | `normalizeEmail` (multibyte, idempotente, sin quitar acentos — D-41), `passwordAcceptable` (72 bytes, NUL), bcrypt costo 12 fijo y hash ficticio igual (D-35, D-37) |
+| `unit/RequestIpTest.php` (24) | `Request::ip` (M-1) | sin proxies, proxy confiable, XFF falsificado, derecha a izquierda, cadena, CIDR v4/v6, huecos (a)–(d) de D-49 |
+| `unit/LogTest.php` (7) | `Log` (M-6) | "supera" estricto, rotación antes de escribir, corrimiento y descarte, tope de archivos, 2 procesos concurrentes sin líneas perdidas/mezcladas; una rotación que falla no hace lanzar a `write` (regresión del hallazgo de A2-08) |
+| `unit/SessionTimeoutTest.php` (7) | `Session` (**M-8**) | antes/después de vencer (manipulando `_last_activity`), ID nuevo y sesión vieja borrada, ventana deslizante, tiempo real 1 s, `gc_maxlifetime ≥ timeout` |
+| `unit/LikeEscapeTest.php` (4) | escape de LIKE (M-3) | `%`, `_`, `\` (la barra primero), multibyte |
+| `integration/LoginAtomicidadTest.php` (3) | límite (M-1, D-46) | 4 fallos + ráfaga de 8 simultáneos → ≤ 1 verificado (401) y filas = previas + verificados ≤ 5; CSRF inválido no reserva; éxito no deja fila |
+| `integration/HistorialTransaccionTest.php` (8) | historial (M-2) | alta sin evento, evento con anterior/nuevo/admin, no-op sin evento, 422/404 sin evento, cambios simultáneos encadenados, FK CASCADE/RESTRICT, vista; PENDIENTE sin la tabla |
 
 ## Corrida completa: `run-all.sh` (D-51)
 

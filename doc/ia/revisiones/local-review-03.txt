@@ -1,0 +1,27 @@
+🔎 utn-sistema-solicitudes: 58 archivos, 5 llamada(s) a qwen2.5-coder:7b [php=53, sql=2, other=1, shell=2] · commits 7bb711d...HEAD
+   1/5 [php] 29 archivo(s) · 1 hallazgo(s) · 28s
+   2/5 [php] 22 archivo(s) · 0 hallazgo(s) · 19s
+   3/5 [php] 2 archivo(s) · 0 hallazgo(s) · 7s
+   4/5 [shell] 2 archivo(s) · 1 hallazgo(s) · 12s
+   5/5 [sql] 2 archivo(s) · 1 hallazgo(s) · 8s
+Proyecto: utn-sistema-solicitudes  ·  alcance: commits 7bb711d...HEAD
+Árbol revisado: c2fdb4ce2d9b860a6013892f31cfa29389731704  ·  modelo: qwen2.5-coder:7b  ·  estado: partial
+Stacks: php=53, sql=2, other=1, shell=2
+Chequeos estáticos: secretos, php -l, bash -n
+NO revisado: doc/ia/registro/2026-10-19.jsonl (hunk @@ -11,6 +11,44 @@): supera el contexto de qwen2.5-coder:7b
+
+Herramientas deterministas (confiables): 0
+
+LLM con evidencia en el diff (la línea existe; el razonamiento hay que confirmarlo): 3
+  [info] app/Controllers/Admin/AuthController.php:28 (llm, evidence_found)
+      La redirección a '/admin' no verifica si el usuario está autenticado. Esto podría permitir que un usuario no autenticado acceda al panel de administración.
+      → Asegúrate de verificar la autenticidad del usuario antes de redirigirlo a '/admin'.
+  [info] database/schema.sql:8 (llm, evidence_found)
+      La eliminación de la tabla `solicitud_eventos` puede causar inconsistencias en los datos si existen referencias a ella.
+      → Si es necesario eliminar la tabla, asegúrese de que no haya dependencias activas y considere crear una copia de seguridad antes de realizar el cambio.
+  [info] tests/run-all.sh:11 (llm, evidence_found)
+      The script does not use 'rm' or 'rm -rf' with variables, nor does it use 'eval' with input. It also does not print secrets to stdout or pass them as arguments visible in ps. There is no curl | sh command. The script uses set -euo pipefail, which is good practice for bash scripts.
+      → No specific action required as the script follows best practices for security and quality.
+
+LLM sin evidencia (probable confabulación; descartar salvo confirmación): 0
+exit=3

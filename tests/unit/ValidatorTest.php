@@ -61,13 +61,21 @@ test('controles (NUL, ESC, DEL, BEL) se rechazan en una línea', function () {
     }
 });
 
-// TAB en una línea hoy se acepta (el contrato de A1-03d solo exige CR/LF); el docblock de
-// Validator dice lo contrario: reportado en A2-07, no se fija acá hasta que se decida.
 test('CR y LF internos se rechazan en un campo de una línea', function () {
     foreach (["A\nB", "A\rB", "A\r\nB"] as $v) {
         [, $err] = validar(['nombre' => $v], REGLAS_LINEA);
         assertContains('no válidos', $err['nombre'] ?? '', 'valor ' . bin2hex($v));
     }
+});
+
+// D-50 (hallazgo de A2-07): el TAB, como CR/LF, solo se acepta en campos multilínea.
+test('TAB interno: rechazado en una línea, aceptado en multiline', function () {
+    [$data, $err] = validar(['nombre' => "A\tB"], REGLAS_LINEA);
+    assertContains('no válidos', $err['nombre'] ?? '', 'una línea');
+    assertSame('', $data['nombre'], 'no se re-muestra');
+    [$data, $err] = validar(['desc' => "A\tB"], ['desc' => ['required', 'multiline']]);
+    assertSame([], $err, 'multiline');
+    assertSame("A\tB", $data['desc']);
 });
 
 test('multiline acepta \n, \r\n y \t internos', function () {

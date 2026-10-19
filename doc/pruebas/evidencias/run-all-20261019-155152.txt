@@ -1,0 +1,307 @@
+
+######## 1. Sintaxis (php -l) ########
+php -l: 0 archivo(s) con errores
+
+######## 2. Tests unitarios ########
+Tests unitarios — 102 tests
+
+== AdminTest ==
+PASS  normalizeEmail: recorta y pasa a minúsculas
+PASS  normalizeEmail: minúsculas multibyte (mb_strtolower, no strtolower)
+PASS  normalizeEmail: no quita acentos (ádmin ≠ admin, D-41)
+PASS  normalizeEmail: idempotente
+PASS  passwordAcceptable: hasta 72 bytes sí, 73 no
+PASS  passwordAcceptable: cuenta bytes, no caracteres (36 "ñ" = 72 bytes)
+PASS  passwordAcceptable: NUL en cualquier posición → false
+PASS  passwordAcceptable: password común → true
+PASS  hash fijo: bcrypt costo 12 (D-35, D-37), independiente de PASSWORD_DEFAULT
+PASS  el hash ficticio de Auth tiene el mismo algoritmo y costo que los reales
+
+== CsrfTest ==
+PASS  token() sin sesión iniciada → LogicException
+PASS  verify: token correcto → true
+PASS  verify: null, vacío y otro token → false
+PASS  verify: sin token en la sesión nunca valida (ni el vacío)
+PASS  verify: token guardado no-string (sesión corrupta) → false
+PASS  verify: el parámetro tipado rechaza arrays (TypeError, no true)
+PASS  rotate: el token anterior deja de valer
+PASS  token(): 64 hex, estable dentro de la sesión y nuevo tras rotate (en proceso hijo)
+
+== EstadoTest ==
+PASS  fromInput: los tres valores válidos
+PASS  fromInput: null y vacío → null
+PASS  fromInput: recorta espacios
+PASS  fromInput: mayúsculas, etiquetas y valores fuera de lista → null
+PASS  los valores del enum coinciden con el ENUM de la tabla
+PASS  label() legible para cada caso
+
+== LikeEscapeTest ==
+PASS  texto sin comodines queda igual
+PASS  % y _ se escapan
+PASS  la barra se escapa primero (no se duplica el escape de % y _)
+PASS  multibyte intacto
+
+== LogTest ==
+PASS  write agrega la línea con "\n" y crea el archivo
+PASS  no rota mientras no SUPERA el máximo (igual al máximo no rota)
+PASS  rota antes de escribir cuando el archivo supera el máximo
+PASS  corrimiento .1 → .2 … y descarte del más viejo (maxArchivos = 2)
+PASS  con maxArchivos = 5 no aparece app.log.6
+PASS  dos procesos escribiendo a la vez: sin líneas perdidas, duplicadas ni mezcladas (flock)
+PASS  una rotación que falla no hace lanzar a write (corre dentro del exception handler)
+
+== RequestIpTest ==
+PASS  sin proxies configurados: X-Forwarded-For se ignora
+PASS  sin clave trusted_proxies en la config: equivale a lista vacía
+PASS  proxy de confianza: devuelve el cliente que agregó
+PASS  XFF desde una IP NO confiable (falsificado) → REMOTE_ADDR
+PASS  el cliente falsifica la izquierda del XFF: se lee de derecha a izquierda
+PASS  cadena de dos proxies de confianza
+PASS  proxy por CIDR IPv4
+PASS  CIDR /32 y /0 en los bordes
+PASS  IPv6: proxy exacto (::1) y por CIDR
+PASS  IPv4 y IPv6 no se confunden entre sí
+PASS  header ausente o vacío con proxy de confianza → REMOTE_ADDR
+PASS  header inválido → REMOTE_ADDR
+PASS  (a) todas las entradas son de confianza → la de más a la izquierda
+PASS  (b) inválida antes de una no confiable (derecha a izquierda) → REMOTE_ADDR
+PASS  (b) una inválida más a la izquierda de la no confiable no importa
+PASS  (c) espacios alrededor de cada entrada
+PASS  (c) puerto en IPv4 y corchetes/puerto en IPv6
+PASS  (c) proxy con puerto en el XFF también se reconoce como de confianza
+PASS  (c) IPv4-mapped en XFF: se devuelve como IPv4
+PASS  (c) IPv4-mapped en REMOTE_ADDR matchea un CIDR IPv4 (y se devuelve como IPv4)
+PASS  (c) entrada IPv4-mapped de un proxy confiable se saltea
+PASS  (d) entrada inválida en trusted_proxies → InvalidArgumentException
+PASS  (d) trusted_proxies que no es lista de strings → InvalidArgumentException
+PASS  sin REMOTE_ADDR → cadena vacía (CLI), sin warnings
+
+== ResponseTest ==
+PASS  redirect rechaza destinos que no son paths locales
+PASS  redirect a un path local → 302 y termina (proceso hijo)
+PASS  redirect con código explícito (303)
+
+== RouterTest ==
+PASS  match: ruta fija exacta
+PASS  match: {id} entero positivo llega como int
+PASS  match: {id} rechaza 0, ceros a la izquierda, signos, no numéricos y > 10 dígitos
+PASS  match: $D — un "\n" final no matchea
+PASS  match: el patrón se escapa (un "." en el patrón no es comodín)
+PASS  allowHeader: agrega HEAD cuando hay GET y deduplica
+PASS  dispatch: ruta inexistente → 404 sin ejecutar acciones
+PASS  dispatch: método no permitido → 405 sin ejecutar acciones
+PASS  dispatch: GET con {id} llega como int a la acción
+PASS  dispatch: HEAD se atiende con la ruta GET
+PASS  M-5: 404 no inicia sesión
+PASS  M-5: 405 no inicia sesión
+PASS  M-5: con ruta y método resueltos, la acción ya corre con sesión activa
+PASS  M-5: también en POST (el CSRF necesita la sesión)
+
+== SessionTimeoutTest ==
+PASS  antes de vencer (59 s de 60): conserva datos e ID
+PASS  después de vencer (61 s de 60): se vacía y cambia el ID
+PASS  después de vencer, la actividad se vuelve a registrar (la sesión nueva no nace vencida)
+PASS  cada request renueva la actividad (ventana deslizante)
+PASS  tiempo real: timeout 1 s y 2 s de espera → vencida
+PASS  tiempo real: timeout 5 s sin espera → vigente
+PASS  gc_maxlifetime ≥ timeout (D-36): el GC no corta antes
+
+== ValidatorTest ==
+PASS  UTF-8 inválido → error "no válidos" y el valor no se re-muestra
+PASS  UTF-8 truncado (\xC3\x28) también se rechaza
+PASS  recorta espacios Unicode (NBSP, ZWSP, BOM, U+3000) en los extremos
+PASS  no recorta espacios internos
+PASS  solo espacios Unicode con required → obligatorio
+PASS  campo ausente con required → obligatorio
+PASS  vacío sin required → sin error
+PASS  controles (NUL, ESC, DEL, BEL) se rechazan en una línea
+PASS  CR y LF internos se rechazan en un campo de una línea
+PASS  TAB interno: rechazado en una línea, aceptado en multiline
+PASS  multiline acepta \n, \r\n y \t internos
+PASS  multiline sigue rechazando NUL, VT, FF y ESC
+PASS  max cuenta caracteres, no bytes (ñ y emoji)
+PASS  max se aplica después del recorte
+PASS  email válido e inválido
+PASS  un error por campo: el primero de la lista de reglas
+PASS  regla desconocida → InvalidArgumentException (error de programación)
+PASS  solo se devuelven los campos con reglas
+PASS  recorte lineal: 20 000 espacios internos sin pcre.jit en < 0,5 s
+
+Resumen: 102 tests — 102 PASS, 0 FAIL, 0 PENDIENTE, 0 SKIP
+
+######## 3. Instalar DB ########
+schema.sql: 9 sentencias ejecutadas
+seed.sql:   4 sentencias ejecutadas
+
+Filas por tabla:
+  admins             1
+  solicitudes        8
+  solicitud_eventos  7
+  login_intentos     0
+
+Solicitudes por estado:
+  pendiente    3
+  en_proceso   3
+  resuelta     2
+
+######## 4. Tests de integración (http://127.0.0.1:8090) ########
+Servidor de prueba en http://127.0.0.1:8090 (8 workers, PID 361002)
+Tests de integración — 11 tests
+
+== HistorialTransaccionTest ==
+PASS  el alta no genera evento
+PASS  cambio real → 302 y un evento con anterior, nuevo y admin
+PASS  mismo estado → no-op: 302 + flash pero sin evento
+PASS  estado inválido (422) e id inexistente (404) no generan evento
+PASS  cambios simultáneos: el historial queda encadenado y coincide con el estado final
+PASS  FK: borrar la solicitud borra su historial (CASCADE)
+PASS  FK: un admin con eventos no se puede borrar (RESTRICT)
+PASS  el detalle muestra "Sin cambios…" y después los cambios
+
+== LoginAtomicidadTest ==
+PASS  ráfaga de 8 logins simultáneos con 4 fallos previos: como mucho 1 se verifica
+PASS  los intentos con CSRF inválido no reservan fila (orden ruta → CSRF → límite)
+PASS  login exitoso no deja fila propia y limpia la cuenta (reserva borrada)
+
+Resumen: 11 tests — 11 PASS, 0 FAIL, 0 PENDIENTE, 0 SKIP
+
+######## 5a. Reinstalar DB (el smoke exige DB recién instalada) ########
+schema.sql: 9 sentencias ejecutadas
+seed.sql:   4 sentencias ejecutadas
+
+Filas por tabla:
+  admins             1
+  solicitudes        8
+  solicitud_eventos  7
+  login_intentos     0
+
+Solicitudes por estado:
+  pendiente    3
+  en_proceso   3
+  resuelta     2
+
+######## 5b. Smoke HTTP (http://127.0.0.1:8090) ########
+smoke.sh — 2026-10-19 15:51:59 — BASE_URL=http://127.0.0.1:8090 — marca=smoke-1792435919-361063
+
+== S — Headers de seguridad (GET /) ==
+PASS  S.1    X-Frame-Options  [obtenido: DENY]
+PASS  S.2    X-Content-Type-Options  [obtenido: nosniff]
+PASS  S.3    Content-Security-Policy con default-src 'self'  [obtenido: default-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self']
+
+== P1 — Solicitud válida ==
+PASS  P1.1   GET / → 200 con form y token CSRF  [obtenido: 200 sí]
+
+== P3 — Acceso al panel sin sesión ==
+PASS  P3.1   GET /admin sin sesión → 302 a /admin/login  [obtenido: 302 /admin/login]
+PASS  P3.2   GET /admin/solicitudes/1 sin sesión → 302 a /admin/login  [obtenido: 302 /admin/login]
+PASS  P3.3   GET /admin?estado=pendiente sin sesión → 302 a /admin/login  [obtenido: 302 /admin/login]
+PASS  P3.4   POST /admin/logout sin sesión → 401 (D-17)  [obtenido: 401]
+
+== P4 — Credenciales incorrectas ==
+PASS  P4.1   login con password incorrecta → 401 + mensaje genérico  [obtenido: 401 sí]
+PASS  P4.2   login con email inexistente → 401 + mismo mensaje (anti-enumeración)  [obtenido: 401 sí]
+PASS  P4.3   GET /admin tras login fallido → 302 a /admin/login  [obtenido: 302 /admin/login]
+PASS  H.1    login con credenciales correctas pero sin CSRF → 419  [obtenido: 419]
+PASS  H.2    GET /admin tras login sin CSRF → sigue sin acceso  [obtenido: 302 /admin/login]
+PASS  H.16   login con password correcta + NUL + sufijo → 401 y sin acceso  [obtenido: 401 302 /admin/login]
+
+== Login correcto (prerequisito de P1.5, P2.4, P5, P6, P7) ==
+PASS  P5.1   login correcto → 302 a /admin  [obtenido: 302 /admin]
+PASS  P5.2   GET /admin con sesión → 200  [obtenido: 200]
+PASS  S.4    el ID de sesión cambia al loguear (session_regenerate_id)  [obtenido: sí]
+PASS  S.5    Set-Cookie de sesión con HttpOnly y SameSite=Lax  [obtenido: sí sí]
+
+== P1 / P2 — Formulario público ==
+PASS  P1.2   POST /solicitudes válida → 302 a /gracias  [obtenido: 302 /gracias]
+PASS  P1.3   GET /gracias → 200 con confirmación visible  [obtenido: 200 sí]
+PASS  P1.4   GET /gracias otra vez (flash consumido) → 302 a /  [obtenido: 302 /]
+PASS  P2.1   POST con campos vacíos → 422 + mensajes de obligatorio  [obtenido: 422 sí]
+PASS  P2.2   POST con email inválido → 422 + mensaje de email  [obtenido: 422 sí]
+PASS  P2.3   POST con campos solo espacios → 422 (trim antes de validar)  [obtenido: 422]
+PASS  P2.5   POST con nombre de solo espacio Unicode (NBSP) → 422  [obtenido: 422]
+PASS  H.14   POST con UTF-8 inválido en nombre → 422 sin fugas, no 500  [obtenido: 422 no]
+PASS  H.3    POST /solicitudes sin token CSRF → 419  [obtenido: 419]
+PASS  H.4    POST /solicitudes con token CSRF falso → 419  [obtenido: 419]
+PASS  H.5    POST /solicitudes con token de otra sesión (sin cookie) → 419  [obtenido: 419]
+PASS  P1.5   la solicitud válida aparece en el listado del panel  [obtenido: sí]
+PASS  P2.4   ninguna alta por inválidos/CSRF (marcas ausentes, única fila nueva = la válida)  [obtenido: no no no no 1]
+PASS  P1.6   detalle persistido (asunto, email, descripción)  [obtenido: 200 sí sí sí]
+
+== P5 — Cambio de estado autorizado ==
+PASS  P5.3   estado inicial = pendiente  [obtenido: pendiente]
+PASS  P5.4   POST estado=en_proceso con sesión + CSRF → 302 al detalle (D-19)  [obtenido: 302 /admin/solicitudes/9]
+PASS  P5.5   el detalle muestra el nuevo estado y el flash  [obtenido: en_proceso sí]
+PASS  P5.6   el flash no se repite al recargar  [obtenido: no]
+PASS  F6.1   filtro ?estado=en_proceso incluye la solicitud  [obtenido: 200 sí]
+PASS  F6.2   filtro ?estado=pendiente no la incluye  [obtenido: 200 no]
+PASS  F6.3   filtro ?estado= vacío → 200 con todas (D-18)  [obtenido: 200 sí]
+PASS  F6.4   filtro ?estado=cerrada (fuera de lista) → 400 (D-18)  [obtenido: 400]
+PASS  S.6    GET /admin/login con sesión → 302 a /admin  [obtenido: 302 /admin]
+
+== P6 — Cambio de estado no autorizado (el estado no debe cambiar) ==
+PASS  P6.1   sin sesión, con CSRF válido de invitado → 401 (D-17); sin cambio  [obtenido: 401 en_proceso]
+PASS  P6.2   con sesión, sin CSRF → 419; sin cambio  [obtenido: 419 en_proceso]
+PASS  P6.3   con sesión, token CSRF de otra sesión → 419; sin cambio  [obtenido: 419 en_proceso]
+PASS  P6.4   estado fuera de lista blanca (cerrada) → 422; sin cambio  [obtenido: 422 en_proceso]
+PASS  P6.5   estado con inyección SQL → 422; sin cambio  [obtenido: 422 en_proceso]
+PASS  P6.6   sin campo estado → 422; sin cambio  [obtenido: 422 en_proceso]
+PASS  P6.7   sin sesión y sin token → 401: auth antes que CSRF (D-16); sin cambio  [obtenido: 401 en_proceso]
+PASS  P6.8   estado como array (estado[]=resuelta) → 422, no 500; sin cambio  [obtenido: 422 en_proceso]
+
+== P7 — HTML/SQL malicioso ==
+PASS  P7.1   POST con <script> y ' OR '1'='1' -- en campos → 302 a /gracias (se acepta como texto)  [obtenido: 302 /gracias]
+PASS  P7.2   listado: <script> escapado (&lt;script&gt;) y nunca crudo  [obtenido: sí no]
+PASS  F5.1   listado por fecha descendente: la solicitud más nueva aparece primero (D-20)  [obtenido: sí]
+PASS  P7.3   detalle: <script> e <img onerror> escapados, nunca crudos  [obtenido: sí sí no no]
+PASS  P7.4   detalle: payload SQL guardado literal y escapado  [obtenido: sí]
+PASS  P7.5   422 re-renderiza valores previos escapados (sin XSS reflejado)  [obtenido: 422 sí no]
+PASS  P7.6   filtro ?estado=' OR '1'='1 → 400 sin error SQL (D-18)  [obtenido: 400 no]
+PASS  P7.7   id con inyección en la ruta → 404  [obtenido: 404]
+
+== H — Método incorrecto, inexistentes y fugas ==
+PASS  H.6    GET /admin/solicitudes/{id}/estado → 405 + Allow con POST  [obtenido: 405 POST]
+PASS  H.7    GET detalle de id inexistente → 404 sin fugas  [obtenido: 404 no]
+PASS  H.8    GET /admin/solicitudes/abc → 404  [obtenido: 404]
+PASS  H.9    POST estado sobre id inexistente → 404  [obtenido: 404]
+PASS  H.10   GET /solicitudes → 405 + Allow con POST  [obtenido: 405 POST]
+PASS  H.11   ruta inexistente → 404 sin fugas  [obtenido: 404 no]
+PASS  H.15   GET /.htaccess no se sirve (ni con php -S) → 403/404  [obtenido: 404]
+PASS  H.12   POST /solicitudes con nombre[] (array) → 422 sin fugas, no 500  [obtenido: 422 no]
+PASS  H.13   filtro ?estado[]=pendiente (array) → 400 sin fugas, no 500  [obtenido: 400 no]
+
+== B — Búsqueda, paginación, historial y sesión perezosa (M-2, M-3, M-5) ==
+PASS  B.1    búsqueda q=pag-<marca> → 200, 21 resultados, página 1 con 20 filas  [obtenido: 200 sí 20]
+PASS  B.2    q con % y _ literales: encuentra «a%b_c» y no «aZZbYc» (comodines escapados)  [obtenido: 200 sí no]
+PASS  B.3    q=<script> reflejado escapado (estado, caption e input), nunca crudo  [obtenido: 200 sí sí no]
+PASS  B.4    q inválido (101 caracteres, UTF-8 inválido, control, salto de línea, array) → 400 sin fugas  [obtenido: 400 400 400 400 400]
+PASS  B.4b   q de exactamente 100 caracteres → 200  [obtenido: 200]
+PASS  B.5    pagina 0, abc, 01, -1, 1.5, espacio, 1e2, array → 400  [obtenido: 400 400 400 400 400 400 400 400]
+PASS  B.6    pagina=2 → 1 fila «Página 2 de 2»; pagina=3 y 999999999 → 404; sin resultados, pagina=3 → 200 vacío  [obtenido: 200 1 sí 404 404 200 sí]
+PASS  B.7    links de paginación y de filtros conservan q y estado (escapados con &amp;)  [obtenido: 200 sí sí sí]
+PASS  B.8    historial visible tras P5 (1 evento pendiente→en proceso); no-op al mismo estado → 302 + flash, sin evento nuevo  [obtenido: sí sí 1 302 1 sí]
+PASS  B.9    404, 405, estático e id inválido sin Set-Cookie; GET / sí crea sesión (M-5)  [obtenido: 404:sin 405:sin 200:sin 404:sin 200:con]
+
+== S — Logout ==
+PASS  S.7    POST /admin/logout sin CSRF → 419 y la sesión sigue  [obtenido: 419 200]
+PASS  S.8    POST /admin/logout con CSRF → 302; después /admin → login  [obtenido: 302 302 /admin/login]
+
+== L — Límite de intentos de login (D-38; requiere DB recién reinstalada) ==
+PASS  L.1    5 fallos (email inexistente) → 401 c/u; 6.º → 429 + Retry-After 1..900 + mensaje  [obtenido: 401 401 401 401 401 429 sí sí]
+PASS  L.4    3 POST sin CSRF entre los fallos → 419 y no cuentan (el 5.º fallo sigue en 401)  [obtenido: 419 419 419 401]
+PASS  L.2    otra cuenta bloqueada no frena al admin demo de la misma IP: login, /admin y logout  [obtenido: 302 /admin 200 302]
+PASS  L.7    email del admin en mayúsculas + password correcta → entra (302, /admin 200) y sale  [obtenido: 302 /admin 200 302]
+PASS  L.3    admin: 5 fallos → 401; 6.º con password correcta → 429 + Retry-After + mensaje; /admin sigue en login  [obtenido: 401 401 401 401 401 429 sí sí 302 /admin/login]
+PASS  L.6    admin bloqueado: ádmin@ / ÁDMIN@ + password correcta → 401|429 y /admin sigue en login  [obtenido: 401 302 /admin/login 401 302 /admin/login]
+Nota: el admin demo queda bloqueado 900s desde esta IP; reinstalar la DB (php scripts/instalar-db.php).
+
+Resumen: 84 casos — 84 PASS, 0 FAIL, 0 SKIP
+Evidencia: doc/pruebas/evidencias/smoke-20261019-155159.txt
+
+== Resumen de run-all ==
+OK     1. Sintaxis (php -l) (2 s)
+OK     2. Tests unitarios (3 s)
+OK     3. Instalar DB (0 s)
+OK     4. Tests de integración (http://127.0.0.1:8090) (2 s)
+OK     5a. Reinstalar DB (el smoke exige DB recién instalada) (0 s)
+OK     5b. Smoke HTTP (http://127.0.0.1:8090) (5 s)
+Todo OK. La DB quedó con el seed recién instalado + las filas del smoke (reinstalar si hace falta).

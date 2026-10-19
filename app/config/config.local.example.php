@@ -9,6 +9,9 @@ return [
         'base_url' => 'http://localhost:8080',
         // Opcionales (defaults en config.php):
         // 'session_timeout'  => 1800,           // segundos de inactividad
+        // 'login_max_por_cuenta' => 5,         // intentos fallidos por IP + email en la ventana
+        // 'login_max_por_ip'     => 20,        // intentos fallidos por IP sola en la ventana
+        // 'login_ventana_seg'    => 900,       // ventana del límite de intentos (segundos)
         // 'trusted_proxies'  => ['10.0.0.0/8'], // solo si hay un proxy/CDN propio delante
         // 'log_max_bytes'    => 1048576,        // rotación de storage/logs/app.log
         // 'log_max_archivos' => 5,
