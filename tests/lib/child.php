@@ -14,13 +14,17 @@ declare(strict_types=1);
 
 /**
  * @param array<string, mixed> $datos
+ * @param bool $cargarApp false: el hijo no carga autoload ni helpers (los carga el código del test)
  * @return array{resultado: mixed, http: int|false, session: int, session_id: string, exit: int}
  */
-function enHijo(string $codigo, array $datos = []): array
+function enHijo(string $codigo, array $datos = [], bool $cargarApp = true): array
 {
     $dir = dirTemporal('utn-hijo');
     $script = $dir . '/hijo.php';
     $app = realpath(APP_DIR);
+    // Sin $cargarApp el hijo no precarga autoload/helpers: lo hace el código del test (p. ej. al
+    // requerir app/bootstrap-cli.php, que los carga por su cuenta y no debe encontrarlos repetidos).
+    $carga = $cargarApp ? "require '{$app}/autoload.php';\nrequire '{$app}/helpers.php';" : '';
     $prologo = <<<PHP
         <?php
         declare(strict_types=1);
@@ -39,8 +43,7 @@ function enHijo(string $codigo, array $datos = []): array
                     ? \$error['message'] : null,
             ], JSON_INVALID_UTF8_SUBSTITUTE), "\\n";
         });
-        require '{$app}/autoload.php';
-        require '{$app}/helpers.php';
+        {$carga}
         \$DATOS = json_decode((string) file_get_contents(__DIR__ . '/datos.json'), true);
         PHP;
     file_put_contents($dir . '/datos.json', json_encode($datos));

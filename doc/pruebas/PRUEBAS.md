@@ -58,6 +58,14 @@ El detalle de cada caso (ID → descripción) está en `tests/README.md`, secci�
 | M-7 tests y corrida local | este documento; `tests/run-all.sh` (no hay CI en GitHub, D-51) |
 | M-8 timeout de sesión | `unit/SessionTimeoutTest.php` |
 
+**Segunda fase de mejoras (R-1..R-3, PLAN §6)**: pruebas escritas contra el contrato (A2-10), pendientes de la corrida oficial de cierre. Con A1-13 en el árbol la suite unitaria pasa a **131** (los 12 casos de Router/redirect por Reflection o proceso hijo se reemplazan por 41 en proceso) y la de integración a **24**:
+
+| Mejora | Pruebas |
+|---|---|
+| R-1 búsqueda FULLTEXT híbrida (D-56) | `unit/FulltextQueryTest.php` (extracción de palabras, stopwords, operadores), `integration/FulltextBusquedaTest.php` (índice, `EXPLAIN`, prefijo, subcadena interna, fallback LIKE, contadores) y los casos B del smoke, que deben dar lo mismo que con LIKE |
+| R-2 `RouteMatcher` y despacho sin `exit` (D-57) | `unit/RouteMatcherTest.php`, `unit/DespachoTest.php` (incluye "ningún `exit` en `app/`"), `integration/ControlFlujoTest.php` (sin log ni vista 500 para 404/405/419/401/redirect) |
+| R-3 `Database` solo por `Config` (D-58) | `unit/DatabaseTest.php`, `integration/ControlFlujoTest.php` (`bootstrap-cli.php`) |
+
 **Fuera de la verificación automática** (D-51): la versión mínima PHP 8.2 y MySQL 8.0 (el desarrollo usa PHP 8.5 y MariaDB 11.8). Procedimiento manual con contenedores en `tests/README.md`, sección "Corrida completa: run-all.sh".
 
 ## Pruebas manuales

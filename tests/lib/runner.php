@@ -22,9 +22,11 @@ declare(strict_types=1);
 const TESTS_ROOT = __DIR__ . '/..';
 const APP_DIR = __DIR__ . '/../../app';
 
-require APP_DIR . '/autoload.php';
-require APP_DIR . '/helpers.php';
+// require_once: la suite de integración puede haber cargado antes app/bootstrap-cli.php (R-3).
+require_once APP_DIR . '/autoload.php';
+require_once APP_DIR . '/helpers.php';
 require __DIR__ . '/child.php';
+require __DIR__ . '/contrato.php';
 
 final class AssertionFailed extends Exception
 {
@@ -197,6 +199,19 @@ function correrSuite(string $dir, string $titulo, array $argv): int
         throw new ErrorException($msg, 0, $nivel, $file, $line);
     });
 
+    // Si una unidad hace exit() en medio de un test (p. ej. un abort que todavía no lanza), PHP
+    // terminaría con exit 0 y la corrida parecería verde: el shutdown lo detecta y fuerza exit 1.
+    $GLOBALS['__en_curso'] = null;
+    register_shutdown_function(static function (): void {
+        if ($GLOBALS['__en_curso'] !== null) {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            printf("\nABORTADO: el test «%s» terminó el proceso (exit/die o error fatal)\n", $GLOBALS['__en_curso']);
+            exit(1);
+        }
+    });
+
     printf("%s — %d tests\n", $titulo, count($tests));
     $cuenta = ['PASS' => 0, 'FAIL' => 0, 'PEND' => 0, 'SKIP' => 0];
     $actual = '';
@@ -209,6 +224,7 @@ function correrSuite(string $dir, string $titulo, array $argv): int
         $detalle = '';
         $nivelBuffer = ob_get_level();
         ob_start(); // lo que imprima la unidad (vistas, abort) no ensucia la salida del runner
+        $GLOBALS['__en_curso'] = $archivo . ' › ' . $nombre;
         try {
             $fn();
         } catch (TestPending $e) {
@@ -227,6 +243,7 @@ function correrSuite(string $dir, string $titulo, array $argv): int
                 ob_end_clean();
             }
             $_SESSION = [];
+            $GLOBALS['__en_curso'] = null;
         }
         $cuenta[$estado]++;
         printf("%-4s  %s%s\n", $estado, $nombre, $detalle !== '' ? "  — {$detalle}" : '');

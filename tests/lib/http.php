@@ -132,11 +132,22 @@ function enParalelo(array $handles): array
     return $out;
 }
 
-/** PDO de la app (App\Core\Database lee su propia config); SKIP si no hay DB. */
+/**
+ * PDO de la app. Desde R-3 (D-58) Database solo se configura por app/bootstrap-cli.php, que
+ * tests/integration/run.php carga antes que el runner. Mientras ese archivo no exista se usa la
+ * lectura perezosa vieja de Database; si ninguna de las dos está disponible → SKIP explicando
+ * por qué (nunca un fatal). El test nunca lee ni imprime la config.
+ */
 function requiereDb(): PDO
 {
+    $cli = $GLOBALS['__bootstrap_cli'] ?? null;
+    if (is_string($cli) && $cli !== 'ok') {
+        skip($cli);
+    }
     try {
         return App\Core\Database::pdo();
+    } catch (LogicException $e) {
+        skip('Database sin configurar y sin app/bootstrap-cli.php (R-3): ' . $e->getMessage());
     } catch (Throwable $e) {
         skip('sin base de datos de prueba: ' . $e->getMessage());
     }

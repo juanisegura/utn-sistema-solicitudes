@@ -18,16 +18,20 @@ test('redirect rechaza destinos que no son paths locales', function () {
     }
 });
 
-test('redirect a un path local → 302 y termina (proceso hijo)', function () {
-    $r = enHijo(<<<'PHP'
-        App\Core\Response::redirect('/admin/solicitudes/1?x=1');
-        $GLOBALS['resultado'] = 'no terminó';
-        PHP);
-    assertSame(302, $r['http']);
-    assertNull($r['resultado'], 'el código después de redirect no se ejecuta');
-});
+// Con R-2 redirect lanza HttpException en vez de exit: estos casos en hijo los reemplaza
+// DespachoTest.php (en proceso).
+if (!hayHttpException()) {
+    test('redirect a un path local → 302 y termina (proceso hijo)', function () {
+        $r = enHijo(<<<'PHP'
+            App\Core\Response::redirect('/admin/solicitudes/1?x=1');
+            $GLOBALS['resultado'] = 'no terminó';
+            PHP);
+        assertSame(302, $r['http']);
+        assertNull($r['resultado'], 'el código después de redirect no se ejecuta');
+    });
 
-test('redirect con código explícito (303)', function () {
-    $r = enHijo('App\Core\Response::redirect("/gracias", 303);');
-    assertSame(303, $r['http']);
-});
+    test('redirect con código explícito (303)', function () {
+        $r = enHijo('App\Core\Response::redirect("/gracias", 303);');
+        assertSame(303, $r['http']);
+    });
+}
