@@ -267,6 +267,11 @@ implementación, revisión adversarial, corrida oficial del orquestador.
   el header falta o es inválido, se usa `REMOTE_ADDR`. Sin proxies configurados el header se
   ignora (comportamiento actual). Validación con `filter_var(FILTER_VALIDATE_IP)`; IPv4 e
   IPv6.
+- API y bordes (D-49): `Request::configure(array $app)` + `Request::ip()`; todas las
+  entradas confiables → la de más a la izquierda; entrada inválida en el recorrido →
+  `REMOTE_ADDR`; se normalizan puerto, corchetes e IPv4-mapped; `trusted_proxies` inválido →
+  `InvalidArgumentException`. M-5: `Session::configure()` en bootstrap + `Session::start()`
+  desde el Router. M-6: `App\Core\Log::configure()/write()`.
 
 ### M-2 Historial de cambios de estado
 

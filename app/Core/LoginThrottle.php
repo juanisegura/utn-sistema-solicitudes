@@ -27,34 +27,53 @@ final class LoginThrottle
     }
 
     /**
-     * null si se puede intentar; si no, segundos hasta poder volver a intentar (Retry-After).
+     * "Reservar y contar" (D-46): registra el intento ANTES de contar, así dos requests
+     * simultáneas se ven entre sí (autocommit: cada INSERT es visible para el COUNT de la otra).
+     * El conteo incluye la fila propia, por eso se compara con ">" límite: el 6.º intento de la
+     * ventana es el primero bloqueado, igual que antes. Bajo carrera puede bloquear de más,
+     * nunca de menos.
+     *
+     * Devuelve [id del intento, null] si se puede verificar, o [null, segundos] si está bloqueado;
+     * en ese caso la fila propia ya se borró (los intentos bloqueados no se registran, D-39).
      * No mira la tabla admins: el resultado es el mismo exista o no el email (no enumera).
+     *
+     * @return array{0: int|null, 1: int|null}
      */
-    public static function segundosBloqueado(string $ip, string $email): ?int
+    public static function reservar(string $ip, string $email): array
     {
         $l = self::limites();
         $hash = LoginIntento::emailHash($email);
+        $id = LoginIntento::registrar($ip, $hash);
+
+        $porCuenta = LoginIntento::contarRecientesCuenta($ip, $hash, $l['ventana']) > $l['cuenta'];
+        $porIp = LoginIntento::contarRecientesIp($ip, $l['ventana']) > $l['ip'];
+        if (!$porCuenta && !$porIp) {
+            return [$id, null];
+        }
+
+        LoginIntento::borrar($id);
         $esperas = [];
-        if (LoginIntento::contarRecientesCuenta($ip, $hash, $l['ventana']) >= $l['cuenta']) {
+        if ($porCuenta) {
             $esperas[] = LoginIntento::segundosHastaLiberar($ip, $hash, $l['ventana']);
         }
-        if (LoginIntento::contarRecientesIp($ip, $l['ventana']) >= $l['ip']) {
+        if ($porIp) {
             $esperas[] = LoginIntento::segundosHastaLiberar($ip, null, $l['ventana']);
         }
 
-        return $esperas === [] ? null : max($esperas);
+        return [null, max($esperas)];
     }
 
-    public static function registrarFallo(string $ip, string $email): void
+    /** Login exitoso: se retira el intento reservado y los fallos previos de esa IP + email. */
+    public static function exito(int $id, string $ip, string $email): void
     {
-        LoginIntento::registrarFallo($ip, LoginIntento::emailHash($email));
-        LoginIntento::purgar();
-    }
-
-    /** Tras un login exitoso: los fallos previos de esa IP + email dejan de contar. */
-    public static function limpiar(string $ip, string $email): void
-    {
+        LoginIntento::borrar($id);
         LoginIntento::limpiarCuenta($ip, LoginIntento::emailHash($email));
+    }
+
+    /** Credenciales inválidas: la fila reservada queda como fallo; de paso se purga lo viejo. */
+    public static function fallo(): void
+    {
+        LoginIntento::purgar();
     }
 
     /** @return array{cuenta: int, ip: int, ventana: int} */

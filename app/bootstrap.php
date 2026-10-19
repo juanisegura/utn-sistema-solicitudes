@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
-// Arranque de cada request web: errores, config, headers de seguridad y sesión.
-// Los scripts CLI no pasan por acá: usan solo app/autoload.php.
+// Arranque de cada request web: errores, log, config y headers de seguridad. La sesión la abre
+// el Router cuando la ruta existe (M-5). Los scripts CLI no pasan por acá: usan solo app/autoload.php.
 
 use App\Core\Database;
+use App\Core\Log;
+use App\Core\LoginThrottle;
+use App\Core\Request;
 use App\Core\Session;
 use App\Core\View;
 
@@ -41,10 +44,7 @@ function app_log(Throwable $e): void
     if ($e->getPrevious() !== null) {
         $line .= ' | causa: ' . $e->getPrevious()::class . ': ' . $e->getPrevious()->getMessage();
     }
-    $line = str_replace(["\r", "\n"], ' ', $line) . "\n";
-    if (@file_put_contents(APP_LOG, $line, FILE_APPEND | LOCK_EX) === false) {
-        error_log($line); // storage/logs no escribible: al menos queda en el log del servidor
-    }
+    Log::write(str_replace(["\r", "\n"], ' ', $line)); // rota por tamaño (M-6)
 }
 
 /** Vista 500 genérica. Solo en debug agrega clase, mensaje y archivo:línea (nunca la config). */
@@ -110,6 +110,9 @@ ini_set('display_errors', $debug ? '1' : '0');
 
 Database::configure($config['db']);
 
-Session::start((int) $config['app']['session_timeout'], $config['app']['env'] === 'production');
+Log::configure(APP_LOG, (int) $config['app']['log_max_bytes'], (int) $config['app']['log_max_archivos']);
+Request::configure($config['app']);
+LoginThrottle::configure($config['app']);
+Session::configure((int) $config['app']['session_timeout'], $config['app']['env'] === 'production');
 
 return $config;

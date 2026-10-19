@@ -7,6 +7,11 @@ return [
         'env'      => 'local',          // local | production
         'debug'    => true,             // false fuera de desarrollo: nunca mostrar errores internos
         'base_url' => 'http://localhost:8080',
+        // Opcionales (defaults en config.php):
+        // 'session_timeout'  => 1800,           // segundos de inactividad
+        // 'trusted_proxies'  => ['10.0.0.0/8'], // solo si hay un proxy/CDN propio delante
+        // 'log_max_bytes'    => 1048576,        // rotación de storage/logs/app.log
+        // 'log_max_archivos' => 5,
     ],
     'db' => [
         'host'    => '127.0.0.1',

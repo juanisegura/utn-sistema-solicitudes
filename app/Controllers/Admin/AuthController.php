@@ -31,9 +31,10 @@ final class AuthController
         $password = Request::string('password') ?? '';
         $ip = Request::ip();
 
-        // Límite de intentos (ADR-0009): bloqueado → ni se verifica la password ni se consulta admins.
-        $espera = LoginThrottle::segundosBloqueado($ip, $email);
-        if ($espera !== null) {
+        // Límite de intentos (ADR-0009): el intento se reserva antes de verificar (exacto bajo
+        // concurrencia). Bloqueado → ni se verifica la password ni se consulta admins.
+        [$intento, $espera] = LoginThrottle::reservar($ip, $email);
+        if ($intento === null) {
             $minutos = (int) ceil($espera / 60);
             $this->renderLogin(
                 $email,
@@ -46,12 +47,12 @@ final class AuthController
         }
 
         if (Auth::attempt($email, $password)) {
-            LoginThrottle::limpiar($ip, $email);
+            LoginThrottle::exito($intento, $ip, $email);
             Response::redirect('/admin');
         }
 
-        // Cuenta todo fallo (también >72 bytes, NUL o email no UTF-8): es un intento de credenciales.
-        LoginThrottle::registrarFallo($ip, $email);
+        // Todo fallo cuenta (también >72 bytes, NUL o email no UTF-8): la fila reservada queda.
+        LoginThrottle::fallo();
         // Mismo mensaje para email inexistente, password errónea o admin inactivo.
         $this->renderLogin($email, 'Email o contraseña incorrectos.', 401);
     }

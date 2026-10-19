@@ -55,6 +55,9 @@ para el desarrollador).
 - Ningún error deja ver SQL, trazas ni rutas absolutas al usuario: lo verifica el chequeo
   de fugas del smoke.
 - Cada código tiene una vista y un test asociado.
-- El log no rota: aceptable para un TP. En producción convendría logrotate.
+- El log `storage/logs/app.log` rota por tamaño (`app.log_max_bytes` = 1 MB,
+  `app.log_max_archivos` = 5; `App\Core\Log`, con `flock` sobre un archivo de lock para que
+  rotación y escritura no se pisen entre requests). En un servidor propio puede
+  reemplazarse por `logrotate` (fase de mejoras, M-6).
 - `exit` en `redirect/abort` simplifica los controllers, pero hace a esos métodos difíciles
   de testear unitariamente: se aceptó porque la verificación es por HTTP (`smoke.sh`).

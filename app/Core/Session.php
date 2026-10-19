@@ -14,19 +14,32 @@ final class Session
     private const OLD = '_old';
 
     private static int $idleTimeout = 1800;
+    private static bool $forceSecure = false;
 
     /** @var array<string, string> old input de la request anterior (se consume al arrancar) */
     private static array $old = [];
 
     /**
+     * Parámetros que usará start(); los fija bootstrap con la config, sin abrir la sesión (M-5:
+     * la abre el Router recién cuando hay ruta y método válidos).
+     *
      * @param int  $idleTimeout segundos sin actividad tras los que la sesión se vacía (app.session_timeout)
      * @param bool $forceSecure cookie Secure aunque no se detecte HTTPS (producción detrás de un proxy/CDN)
      */
-    public static function start(int $idleTimeout, bool $forceSecure = false): void
+    public static function configure(int $idleTimeout, bool $forceSecure = false): void
+    {
+        self::$idleTimeout = $idleTimeout;
+        self::$forceSecure = $forceSecure;
+    }
+
+    /** Abre la sesión. Los parámetros, si se pasan, reemplazan a los de configure(). */
+    public static function start(?int $idleTimeout = null, ?bool $forceSecure = null): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
             return;
         }
+        $idleTimeout ??= self::$idleTimeout;
+        $forceSecure ??= self::$forceSecure;
         ini_set('session.use_strict_mode', '1');   // rechaza IDs que el servidor no emitió (fixation)
         ini_set('session.use_only_cookies', '1');
         ini_set('session.use_trans_sid', '0');

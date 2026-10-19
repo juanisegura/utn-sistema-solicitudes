@@ -57,17 +57,29 @@ debe permitir enumerar cuentas ni convertirse en una forma fácil de dejar al ad
 
 ## Consecuencias
 
-- **Carrera:** contar y registrar no son atómicos; N requests simultáneas pueden pasar el
-  chequeo antes de que se registre ninguna, así que el límite real puede excederse por el
-  grado de concurrencia del atacante. Se acepta como límite aproximado: el objetivo es
-  volver la fuerza bruta impráctica, no garantizar un número exacto. Hacerlo exacto
-  requeriría `SELECT … FOR UPDATE` o un contador con `INSERT … ON DUPLICATE KEY UPDATE`.
+- **Concurrencia (exacto, D-46):** el intento se **reserva antes de contar**: INSERT en
+  `login_intentos` y recién después el conteo de la ventana, que incluye la fila propia. Si
+  supera el límite se borra esa fila y se responde 429 (los bloqueados no quedan
+  registrados, D-39). Si las credenciales son válidas se borra la fila y se limpian los
+  fallos de la cuenta; si no, la fila queda como fallo. Con autocommit cada INSERT es
+  visible para el COUNT de las requests concurrentes: para que dos pasen haría falta que
+  ambos cuenten ≤ límite incluyendo la fila del otro, imposible cuando solo queda un lugar.
+  Bajo carrera puede bloquear de más, nunca de menos. Medido con 8 workers, 4 fallos
+  previos y 10 o 30 intentos simultáneos: pasa a verificar exactamente 1, contra 2 a 6 de
+  10 con la versión anterior. Sin `SELECT … FOR UPDATE`, locks con nombre ni filas contador.
 - **NAT compartido:** usuarios detrás de la misma IP pública (campus, empresa) comparten el
   límite de 20 por IP; un atacante en esa red puede bloquear el login de los demás por hasta
   15 min. Aceptable para un panel de pocos administradores; los umbrales son configurables.
-- **Proxy o CDN delante:** `REMOTE_ADDR` sería la IP del proxy y todos compartirían el
-  límite. Habría que tomar la IP de `X-Forwarded-For` solo cuando la conexión viene de un
-  proxy de confianza.
+- **Proxy o CDN delante (D-47, D-49):** por defecto la IP es `REMOTE_ADDR` y
+  `X-Forwarded-For` se ignora, porque lo puede escribir cualquier cliente. Si hay proxies
+  propios se declaran en `app.trusted_proxies` (IPs o CIDR, IPv4 e IPv6; una entrada
+  inválida aborta la carga de la config). Solo cuando `REMOTE_ADDR` es uno de ellos se lee
+  `X-Forwarded-For` **de derecha a izquierda**, porque el tramo final lo agregaron nuestros
+  proxies. La IP del cliente es la primera entrada que no es un proxy de confianza; si
+  aparece una entrada inválida antes, se usa `REMOTE_ADDR`; si todas son de confianza, la
+  de más a la izquierda. Las direcciones se normalizan (puertos, corchetes de IPv6,
+  IPv4-mapped) antes de comparar y de guardar. Sin esta configuración, todos los usuarios
+  detrás de un proxy comparten el límite por IP.
 - **Variantes del email (corregido, D-41):** el email se normaliza en un solo lugar
   (`Admin::normalizeEmail` = `mb_strtolower(trim())`), que usan el alta, la búsqueda del
   login y el hash del contador. La búsqueda del admin compara en forma **binaria**

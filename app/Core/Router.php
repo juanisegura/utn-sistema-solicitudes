@@ -6,7 +6,7 @@ namespace App\Core;
 
 /**
  * Tabla de rutas → controller. Concentra en un solo lugar lo que no se puede olvidar en una
- * ruta nueva: método permitido (405 + Allow), autenticación y CSRF.
+ * ruta nueva: método permitido (405 + Allow), sesión, autenticación y CSRF.
  *
  * Ruta: [método, patrón, [Controller::class, 'acción'], opciones]
  *   patrón: '/admin/solicitudes/{id}' — {id} solo acepta enteros positivos y llega a la acción como int.
@@ -36,6 +36,8 @@ final class Router
                 continue;
             }
 
+            // M-5: la sesión se abre recién acá; 404 y 405 no crean sesión ni mandan Set-Cookie.
+            Session::start();
             $this->applyMiddleware($verb, $route[3] ?? []);
             [$class, $action] = $handler;
             (new $class())->$action(...$params);

@@ -85,3 +85,9 @@ búsqueda no distingue mayúsculas ni acentos (`Admin@Example.com` encuentra a
 `admin@example.com`). No debilita la autenticación: igual hace falta la contraseña correcta
 de esa cuenta, y el `UNIQUE` con la misma collation impide dos cuentas que difieran solo en
 eso.
+
+## Revisión posterior (fase de mejoras, M-5)
+
+La sesión no se abre en el arranque sino en el Router, después de resolver ruta y método y
+antes de autenticación y CSRF: las respuestas 404 y 405 y los archivos estáticos no crean
+sesión ni envían `Set-Cookie`. Cierra la limitación D-32.

@@ -16,6 +16,11 @@ $defaults = [
         'login_max_por_cuenta' => 5,   // por IP + email
         'login_max_por_ip'     => 20,  // por IP sola (muchos emails desde la misma IP)
         'login_ventana_seg'    => 900,
+        // IPs o CIDR de proxies propios (ADR-0009, D-47). Vacío: se ignora X-Forwarded-For.
+        'trusted_proxies' => [],
+        // Rotación de storage/logs/app.log (M-6): tamaño máximo y cantidad de archivos viejos.
+        'log_max_bytes'    => 1048576,
+        'log_max_archivos' => 5,
     ],
     'db' => [
         'host'    => '127.0.0.1',

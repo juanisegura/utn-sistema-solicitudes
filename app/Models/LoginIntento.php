@@ -20,9 +20,17 @@ final class LoginIntento
         return hash('sha256', Admin::normalizeEmail($email));
     }
 
-    public static function registrarFallo(string $ip, string $emailHash): void
+    /** Registra un intento y devuelve su id (para poder retirarlo si queda bloqueado o tiene éxito). */
+    public static function registrar(string $ip, string $emailHash): int
     {
         Database::execute('INSERT INTO login_intentos (ip, email_hash) VALUES (?, ?)', [$ip, $emailHash]);
+
+        return Database::lastInsertId();
+    }
+
+    public static function borrar(int $id): void
+    {
+        Database::execute('DELETE FROM login_intentos WHERE id = ?', [$id]);
     }
 
     public static function contarRecientesCuenta(string $ip, string $emailHash, int $ventanaSeg): int
