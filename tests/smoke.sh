@@ -212,6 +212,12 @@ check P2.2 "POST con email inválido → 422 + mensaje de email" "422 sí" "$COD
 post "$J_PUB" /solicitudes "$CSRF_FIELD=$T_PUB" "$F_NOMBRE=   " "$F_EMAIL=ana@example.com" \
   "$F_ASUNTO=   " "$F_DESC=   "
 check P2.3 "POST con campos solo espacios → 422 (trim antes de validar)" "422" "$CODE"
+post "$J_PUB" /solicitudes "$CSRF_FIELD=$T_PUB" "$F_NOMBRE=$(printf '\xc2\xa0')" "$F_EMAIL=ana@example.com" \
+  "$F_ASUNTO=Nbsp $MARCA-nbsp" "$F_DESC=x"
+check P2.5 "POST con nombre de solo espacio Unicode (NBSP) → 422" "422" "$CODE"
+post "$J_PUB" /solicitudes "$CSRF_FIELD=$T_PUB" "$F_NOMBRE=$(printf '\xffAna')" "$F_EMAIL=ana@example.com" \
+  "$F_ASUNTO=Utf8 $MARCA-utf8" "$F_DESC=x"
+check H.14 "POST con UTF-8 inválido en nombre → 422 sin fugas, no 500" "422 no" "$CODE $(fuga)"
 post "$J_PUB" /solicitudes "$F_NOMBRE=Ana" "$F_EMAIL=ana@example.com" "$F_ASUNTO=SinCsrf $MARCA-sincsrf" "$F_DESC=x"
 check H.3 "POST /solicitudes sin token CSRF → 419" "419" "$CODE"
 post "$J_PUB" /solicitudes "$CSRF_FIELD=token-falso" "$F_NOMBRE=Ana" "$F_EMAIL=ana@example.com" \
@@ -228,8 +234,8 @@ if ((ADMIN_OK)); then
   ID=$(id_por_marca "$BODY" "Valida $MARCA")
   MAX1=$(max_id "$BODY")
   check P1.5 "la solicitud válida aparece en el listado del panel" "sí" "$([[ -n $ID ]] && echo sí || echo no)"
-  check P2.4 "ninguna alta por inválidos/CSRF (marcas ausentes, única fila nueva = la válida)" "no no 1" \
-    "$(hasF "$MARCA-email") $(hasF "$MARCA-sincsrf") $((MAX1 - MAX0))"
+  check P2.4 "ninguna alta por inválidos/CSRF (marcas ausentes, única fila nueva = la válida)" "no no no no 1" \
+    "$(hasF "$MARCA-email") $(hasF "$MARCA-sincsrf") $(hasF "$MARCA-nbsp") $(hasF "$MARCA-utf8") $((MAX1 - MAX0))"
   if [[ -n $ID ]]; then
     req "$J_ADM" GET "/admin/solicitudes/$ID"
     check P1.6 "detalle persistido (asunto, email, descripción)" "200 sí sí sí" \
@@ -359,6 +365,8 @@ req "$J_PUB" GET /solicitudes
 check H.10 "GET /solicitudes → 405 + Allow con POST" "405 .*POST.*" "$CODE $(header Allow)"
 req "$J_PUB" GET "/no-existe-$MARCA"
 check H.11 "ruta inexistente → 404 sin fugas" "404 no" "$CODE $(fuga)"
+req "$J_PUB" GET /.htaccess
+check H.15 "GET /.htaccess no se sirve (ni con php -S) → 403/404" "403|404" "$CODE"
 post "$J_PUB" /solicitudes "$CSRF_FIELD=$T_PUB" "$F_NOMBRE[]=Ana" "$F_EMAIL=ana@example.com" \
   "$F_ASUNTO=Array $MARCA-array" "$F_DESC=x"
 check H.12 "POST /solicitudes con nombre[] (array) → 422 sin fugas, no 500" "422 no" "$CODE $(fuga)"

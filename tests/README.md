@@ -73,6 +73,8 @@ Columna "Prueba mínima": P1 a P7 corresponden a la consigna (P1 solicitud váli
 | P2.1 | POST con campos vacíos → 422 + mensajes de obligatorio | P2 |
 | P2.2 | POST con email inválido → 422 + mensaje de email | P2 |
 | P2.3 | POST con campos solo espacios → 422 (trim antes de validar) | P2 |
+| P2.5 | POST con nombre de solo espacio Unicode (NBSP) → 422 | P2 |
+| H.14 | POST con UTF-8 inválido en nombre → 422 sin fugas, no 500 | extra · H |
 | H.3 | POST /solicitudes sin token CSRF → 419 | extra · H |
 | H.4 | POST /solicitudes con token CSRF falso → 419 | extra · H |
 | H.5 | POST /solicitudes con token de otra sesión (sin cookie) → 419 | extra · H |
@@ -110,6 +112,7 @@ Columna "Prueba mínima": P1 a P7 corresponden a la consigna (P1 solicitud váli
 | H.9 | POST estado sobre id inexistente → 404 | extra · H |
 | H.10 | GET /solicitudes → 405 + Allow con POST | extra · H |
 | H.11 | ruta inexistente → 404 sin fugas | extra · H |
+| H.15 | GET /.htaccess no se sirve (ni con php -S) → 403/404 | extra · H |
 | H.12 | POST /solicitudes con nombre[] (array) → 422 sin fugas, no 500 | extra · H |
 | H.13 | filtro ?estado[]=pendiente (array) → 400 sin fugas, no 500 | extra · H |
 | S.7 | POST /admin/logout sin CSRF → 419 y la sesión sigue | extra · S |
@@ -130,7 +133,7 @@ Al inicio de `tests/smoke.sh` (bloque "Contrato asumido") se fijan los nombres d
 | `RE_ERR_EMAIL` | email o correo seguido de "válido" (en ambos órdenes) | mensaje de email inválido |
 | `RE_LOGIN_ERROR` | `Email o contraseña incorrectos` | mensaje genérico de login (`.{1,2}` tolera la ñ en cualquier codificación) |
 | `RE_FLASH_ESTADO` | `Estado actualizado` | flash tras un cambio de estado (P5.5, P5.6) |
-| `RE_FUGA` | `SQLSTATE`, `PDOException`, `Stack trace`, `Fatal error`, `on line N`, error de SQL de MySQL | detección de fugas de error (H.7, H.11, H.12, H.13, P7.6) |
+| `RE_FUGA` | `SQLSTATE`, `PDOException`, `Stack trace`, `Fatal error`, `on line N`, error de SQL de MySQL | detección de fugas de error (H.7, H.11, H.12, H.13, H.14, P7.6) |
 | `ID_INEXISTENTE` | `999999999` | id usado en H.7 y H.9 |
 
 Supuestos estructurales sobre el HTML:

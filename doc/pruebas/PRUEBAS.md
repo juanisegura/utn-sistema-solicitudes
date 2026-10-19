@@ -32,6 +32,8 @@ Las columnas "Resultado obtenido" y "Evidencia" se completan al ejecutar contra 
 | Logout | S.7, S.8 | POST sin CSRF 419 y la sesión sigue activa; con CSRF 302, y luego /admin redirige a /admin/login | | |
 | Filtro por estado (F6) | F6.1 a F6.4 | ?estado=en_proceso incluye la solicitud; ?estado=pendiente no la incluye; ?estado= vacío da 200 con todas; ?estado=cerrada da 400 | | |
 | Orden del listado (F5) | F5.1 | Listado ordenado por created_at DESC: la solicitud más nueva aparece primero (D-20) | | |
+| Entrada malformada: UTF-8 inválido (H.14) y espacios Unicode (P2.5) | H.14, P2.5 | 422, nunca 500 ni alta | | |
+| Archivos ocultos bajo php -S (H.15) | H.15 | GET /.htaccess → 403/404 | | |
 | Parámetros como array (H.12, H.13, P6.8) | H.12, H.13, P6.8 | nombre[] en el formulario público 422 (H.12); ?estado[] 400 (H.13); estado[] en el cambio de estado 422 (P6.8); sin fugas de error ni 500 | | |
 
 ## Pruebas manuales (navegador)
