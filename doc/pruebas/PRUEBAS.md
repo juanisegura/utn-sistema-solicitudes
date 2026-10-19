@@ -34,7 +34,7 @@ Las columnas "Resultado obtenido" y "Evidencia" se completan al ejecutar contra 
 | Orden del listado (F5) | F5.1 | Listado ordenado por created_at DESC: la solicitud más nueva aparece primero (D-20) | | |
 | Entrada malformada: UTF-8 inválido (H.14) y espacios Unicode (P2.5) | H.14, P2.5 | 422, nunca 500 ni alta | | |
 | Archivos ocultos bajo php -S (H.15) | H.15 | GET /.htaccess → 403/404 | | |
-| Límite de intentos (D-38) | L.1 a L.4 | 5 fallos → 401; 6.º → 429 + Retry-After + "Demasiados intentos" (cuenta inexistente y admin, este con la password correcta); POST sin CSRF → 419 sin contar; una cuenta bloqueada no frena a otra desde la misma IP | | |
+| Límite de intentos (D-38, D-41) | L.1 a L.4, L.6, L.7 | 5 fallos → 401; 6.º → 429 + Retry-After + "Demasiados intentos" (cuenta inexistente y admin, este con la password correcta); POST sin CSRF → 419 sin contar; una cuenta bloqueada no frena a otra desde la misma IP; con el admin bloqueado, variantes con acento + password correcta → 401/429 (L.6); email en mayúsculas sigue entrando (L.7) | | |
 | Password con NUL (H.16) | H.16 | password correcta + %00 + sufijo en el login → 401 y /admin sigue en 302 (bcrypt ignora lo que sigue al NUL) | | |
 | Parámetros como array (H.12, H.13, P6.8) | H.12, H.13, P6.8 | nombre[] en el formulario público 422 (H.12); ?estado[] 400 (H.13); estado[] en el cambio de estado 422 (P6.8); sin fugas de error ni 500 | | |
 
@@ -60,7 +60,7 @@ Verificado a mano en A2-05 contra la implementación de A1-06 (servidor propio e
 - [x] L.5 límite por IP: 20 fallos con 20 emails distintos desde 127.0.0.11 → 401 c/u; el 21.º con otro email → 429 (Retry-After 897) y el admin con password correcta desde esa IP → 429; desde 127.0.0.12 el admin entra (302).
 - [x] Los intentos bloqueados (429) no se registran: 3 más desde 127.0.0.11 dejaron el conteo en 20 filas.
 - [x] El 429 re-renderiza el login con "Probá de nuevo en 15 minutos." y el email escapado.
-- [ ] **Hueco**: con admin@example.com bloqueado, `ádmin@example.com` (acento) da 401 en vez de 429 y con la password correcta **entra** (302, /admin 200): la colación `utf8mb4_unicode_ci` lo resuelve al mismo admin, pero el contador usa otro hash. Mayúsculas y espacios sí se normalizan (429). Pendiente de decisión del orquestador.
+- [x] Hueco de acentos (hallado en A2-05: con admin@example.com bloqueado, `ádmin@example.com` + password correcta entraba por la colación `utf8mb4_unicode_ci`): corregido por D-41 y cubierto por **L.6**; L.7 confirma que las mayúsculas siguen normalizándose.
 
 Comportamiento con JavaScript deshabilitado: no aplica, la aplicación no usa JS.
 

@@ -121,7 +121,9 @@ Columna "Prueba mínima": P1 a P7 corresponden a la consigna (P1 solicitud váli
 | L.1 | 5 logins fallidos con un email inexistente de la corrida → 401 c/u; el 6.º → 429 + `Retry-After` entero en [1, 900] + "Demasiados intentos" | extra · L (D-38) |
 | L.4 | 3 POST de login sin CSRF (sin campo, token falso, sin campo) intercalados en la secuencia de L.1 → 419 y no cuentan: el 5.º fallo válido sigue en 401 | extra · L (D-38) |
 | L.2 | con la cuenta de L.1 bloqueada, el admin demo desde la misma IP entra, ve /admin y sale (límite por cuenta, no global) | extra · L (D-38) |
+| L.7 | email del admin en mayúsculas (`ADMIN@EXAMPLE.COM`) + password correcta → 302, /admin 200, logout 302 (la normalización a minúsculas sigue vigente con D-41) | extra · L (D-41) |
 | L.3 | admin demo: 5 fallos → 401; el 6.º con la password **correcta** → 429 + Retry-After + mensaje; /admin sigue en 302 a login | extra · L (D-38) |
+| L.6 | con el admin bloqueado (después de L.3): `ádmin@example.com` y `ÁDMIN@example.com` + password correcta → 401 o 429, nunca 302; /admin sigue en 302 a login (bypass por acentos, D-41) | extra · L (D-41) |
 
 ## Contrato asumido
 
@@ -162,7 +164,7 @@ php scripts/instalar-db.php   # borra y recrea las tablas, y carga el seed
 - El seed trae sus propias solicitudes, entre ellas una con `<script>`. Por eso P7.2 busca la fila de esta corrida por su marca y no la primera que contenga el payload.
 - La contraseña demo del admin del seed es la que usa `ADMIN_PASSWORD` por defecto (ver "Requisitos y ejecución").
 - **El smoke exige una DB recién reinstalada** (D-38): los intentos fallidos persisten 15 min en `login_intentos` y L.3 deja al admin demo bloqueado desde la IP de la corrida. Una segunda corrida sin reinstalar falla desde P5.1 (login → 429). Si el primer intento de L.1 ya da 429, el script avisa.
-- Presupuesto del límite por IP (20 fallos / 15 min): una corrida registra 13 fallos válidos desde la misma IP (P4.1, P4.2, H.16, 5 de L.1, 5 de L.3); P5.1 y L.2 además borran los del admin. Queda margen aun si los 429 se registraran (serían 15). Agregar casos con logins fallidos exige rehacer esta cuenta.
+- Presupuesto del límite por IP (20 fallos / 15 min): una corrida registra hasta 15 fallos válidos desde la misma IP (P4.1, P4.2, H.16, 5 de L.1, 5 de L.3 y hasta 2 de L.6 si responden 401); P5.1, L.2 y L.7 además borran los del admin, y los 429 no se registran (PLAN §Extra 1, "Precisiones"). Margen: 5. Agregar casos con logins fallidos exige rehacer esta cuenta.
 
 ## Prueba manual del límite por IP (L.5, D-38)
 

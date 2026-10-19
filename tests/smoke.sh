@@ -419,9 +419,10 @@ fi
 seccion "L — Límite de intentos de login (D-38; requiere DB recién reinstalada)"
 # Los fallos persisten 15 min en login_intentos: una segunda corrida sin reinstalar encuentra al
 # admin demo bloqueado por L.3. Presupuesto por IP (límite 20): fallos válidos de toda la corrida
-# = P4.1, P4.2, H.16 + 5 de L.1 + 5 de L.3 = 13 (15 si los 429 también se registraran); P5.1 y
-# L.2 además borran los fallos del admin. L.4 reutiliza la secuencia de L.1 para no gastar 5 más.
-# L.3 bloquea al admin demo: va último y nada posterior necesita loguearse.
+# = P4.1, P4.2, H.16 + 5 de L.1 + 5 de L.3 + hasta 2 de L.6 = 15 (los 429 no se registran,
+# PLAN §Extra 1 "Precisiones"); P5.1, L.2 y L.7 además borran los fallos del admin. L.4 reutiliza
+# la secuencia de L.1 para no gastar 5 más. L.3 bloquea al admin demo: después solo va L.6, que
+# justamente necesita al admin bloqueado.
 
 # retry_ok → "sí" si el último response trae Retry-After entero en [1, VENTANA_SEG]
 retry_ok() {
@@ -475,6 +476,18 @@ L2+=" $CODE"
 check L.2 "otra cuenta bloqueada no frena al admin demo de la misma IP: login, /admin y logout" \
   "302 /admin 200 302" "$L2"
 
+# L.7 — la normalización a minúsculas sigue funcionando: ADMIN@EXAMPLE.COM entra (D-41)
+nuevo_jar
+req "$J_NUEVO" GET /admin/login
+post "$J_NUEVO" /admin/login "$CSRF_FIELD=$(csrf_de "$BODY")" \
+  "$F_LOGIN_EMAIL=$(tr '[:lower:]' '[:upper:]' <<< "$ADMIN_EMAIL")" "$F_LOGIN_PASS=$ADMIN_PASSWORD"
+L7="$CODE $(loc)"
+req "$J_NUEVO" GET /admin
+L7+=" $CODE"
+post "$J_NUEVO" /admin/logout "$CSRF_FIELD=$(csrf_de "$BODY")"
+check L.7 "email del admin en mayúsculas + password correcta → entra (302, /admin 200) y sale" \
+  "302 /admin 200 302" "$L7 $CODE"
+
 # L.3 — admin demo: 5 fallos y el 6.º con la password CORRECTA → 429 sin verificarla
 nuevo_jar
 req "$J_NUEVO" GET /admin/login
@@ -489,6 +502,19 @@ CODES_L3+="$CODE $(retry_ok) $(has "$RE_BLOQUEO")"
 req "$J_NUEVO" GET /admin
 check L.3 "admin: 5 fallos → 401; 6.º con password correcta → 429 + Retry-After + mensaje; /admin sigue en login" \
   "401 401 401 401 401 429 sí sí 302 /admin/login" "$CODES_L3 $CODE $(loc)"
+# L.6 — con el admin bloqueado, variantes con acento no son otra cuenta (D-41): con la password
+# correcta nunca autentican. Hoy la colación unicode_ci las resolvía al mismo admin con otro contador.
+L6=""
+for variante in "ádmin@example.com" "ÁDMIN@example.com"; do
+  nuevo_jar
+  req "$J_NUEVO" GET /admin/login
+  post "$J_NUEVO" /admin/login "$CSRF_FIELD=$(csrf_de "$BODY")" "$F_LOGIN_EMAIL=$variante" "$F_LOGIN_PASS=$ADMIN_PASSWORD"
+  L6+="$CODE "
+  req "$J_NUEVO" GET /admin
+  L6+="$CODE $(loc) "
+done
+check L.6 "admin bloqueado: ádmin@ / ÁDMIN@ + password correcta → 401|429 y /admin sigue en login" \
+  "(401|429) 302 /admin/login (401|429) 302 /admin/login" "${L6% }"
 echo "Nota: el admin demo queda bloqueado ${VENTANA_SEG}s desde esta IP; reinstalar la DB (php scripts/instalar-db.php)."
 
 TOTAL=$((PASS + FAIL + SKIP))
