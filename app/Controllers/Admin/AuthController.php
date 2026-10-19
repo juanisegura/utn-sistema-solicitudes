@@ -22,6 +22,10 @@ final class AuthController
 
     public function login(): void
     {
+        // Con sesión activa no se procesan credenciales (ni se regenera la sesión de otro login).
+        if (Auth::user() !== null) {
+            Response::redirect('/admin');
+        }
         $email = Request::string('email') ?? '';
         $password = Request::string('password') ?? '';
 

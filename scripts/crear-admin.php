@@ -73,6 +73,9 @@ if (mb_strlen($password) < PASSWORD_MIN) {
 if (strlen($password) > PASSWORD_MAX_BYTES) {
     fallar('la password supera ' . PASSWORD_MAX_BYTES . ' bytes.');
 }
+if (str_contains($password, "\0")) {
+    fallar('la password no puede contener el carácter nulo (bcrypt la cortaría ahí).');
+}
 if (!hash_equals($password, preguntarOculto('Repetir password: '))) {
     fallar('las passwords no coinciden.');
 }

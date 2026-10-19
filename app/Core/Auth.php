@@ -12,8 +12,9 @@ final class Auth
     private const SESSION_KEY = 'admin_id';
 
     /**
-     * Hash bcrypt (costo 12, el de PASSWORD_DEFAULT) de un valor aleatorio descartado. Se verifica
-     * contra él cuando el email no existe para que la respuesta tarde lo mismo (anti-enumeración).
+     * Hash bcrypt de un valor aleatorio descartado, con el mismo algoritmo y costo que
+     * Admin::HASH_ALGO/HASH_OPTIONS (bcrypt, 12). Se verifica contra él cuando el email no existe
+     * para que la respuesta tarde lo mismo (anti-enumeración). Si cambia el costo, regenerarlo.
      */
     private const DUMMY_HASH = '$2y$12$b4G73qS5Pyvkg2oN9vJu3uJgNEnABoDdNXn0tPgqhodpewCOLWvyy';
 
@@ -23,8 +24,8 @@ final class Auth
     /** true si las credenciales son válidas y el admin está activo; cualquier fallo es indistinguible. */
     public static function attempt(string $email, #[\SensitiveParameter] string $password): bool
     {
-        // Más de 72 bytes nunca fue una password válida (bcrypt las trunca): se rechaza sin verificar.
-        if (strlen($password) > Admin::MAX_PASSWORD_BYTES) {
+        // >72 bytes o con NUL nunca fue una password válida (bcrypt truncaría): fallo genérico sin verificar.
+        if (!Admin::passwordAcceptable($password)) {
             return false;
         }
         // Bytes no UTF-8 en el email: la DB en modo estricto rechazaría la consulta (→ 500).
@@ -45,7 +46,7 @@ final class Auth
         Csrf::rotate();
         Session::set(self::SESSION_KEY, $id);
         Admin::touchLastLogin($id);
-        if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+        if (Admin::needsRehash($hash)) {
             Admin::updatePasswordHash($id, $password);
         }
 

@@ -60,7 +60,7 @@ Definida en [database/schema.sql](../database/schema.sql), con dos tablas:
 |---|---|---|---|
 | SQL injection | Consultas preparadas reales; el estado entra solo como valor del enum `Estado` | [Database.php](../app/Core/Database.php), [Solicitud.php](../app/Models/Solicitud.php), [Estado.php](../app/Models/Estado.php) | P6.5, P7.1, P7.4, P7.6, P7.7 |
 | XSS | `e()` (`htmlspecialchars` con `ENT_QUOTES`) en la salida; CSP `default-src 'self'`. Se guarda lo enviado y se escapa al mostrar (D-30) | [helpers.php](../app/helpers.php), [Views/](../app/Views/), [bootstrap.php](../app/bootstrap.php) | P7.2, P7.3, P7.4, P7.5, S.3 |
-| Contraseñas | `password_hash` / `password_verify`, `password_needs_rehash`, hash ficticio si el email no existe, rechazo de más de 72 bytes | [Auth.php](../app/Core/Auth.php) | P4.1, P4.2 (mismo mensaje y 401) |
+| Contraseñas | bcrypt con costo fijo 12 (`Admin::HASH_ALGO`/`HASH_OPTIONS`, D-35) en el alta, el rehash y el hash ficticio que se verifica si el email no existe; `password_verify`; rechazo de más de 72 bytes o con byte NUL (D-36) | [Auth.php](../app/Core/Auth.php), [Admin.php](../app/Models/Admin.php) | P4.1, P4.2 (mismo mensaje y 401), H.16 |
 | Sesión | Cookie `utn_sesion` HttpOnly y SameSite=Lax (Secure con HTTPS o `env=production`), `use_strict_mode`, regeneración de ID y del token CSRF en login, timeout por inactividad (`app.session_timeout`), logout destruye la sesión y la cookie | [Session.php](../app/Core/Session.php), [Auth.php](../app/Core/Auth.php) | S.4, S.5, S.8; timeout solo manual |
 | CSRF | Token de 32 bytes, `hash_equals`, validado en el Router en todo POST; fallo devuelve 419 | [Csrf.php](../app/Core/Csrf.php), [Router.php](../app/Core/Router.php) | H.1, H.3, H.4, H.5, P6.2, P6.3, S.7 |
 | Autorización / acceso al panel | `'auth' => true` en las rutas `/admin/*` salvo login; `Auth::user()` re-verifica en DB que el admin siga activo. Sin sesión: GET 302, POST 401 (D-17) | [routes.php](../app/routes.php), [Auth.php](../app/Core/Auth.php) | P3.1–P3.4, P6.1, P6.7, H.2 |
@@ -76,11 +76,12 @@ Definida en [database/schema.sql](../database/schema.sql), con dos tablas:
 - **UTF-8 inválido y modo estricto.** Un nombre con bytes inválidos llegaba a la DB, que lo rechazaba y terminaba en 500. `Validator` ahora usa `mb_check_encoding` y responde 422 (D-31).
 - **Campos "obligatorios" con solo NBSP.** `trim()` solo quita espacios ASCII, así que pasaban como no vacíos. Implementé un recorte Unicode en `Validator` (D-31).
 - **Deprecaciones de PHP 8.5.** En local uso PHP 8.5, que ya depreca las constantes `PDO::MYSQL_*` (lo vi al escribir la capa de datos). La revisión del agente revisor (A2-03) marcó que el manejador de errores convertía cualquier deprecación en excepción, de modo que una actualización de PHP podía tumbar requests que funcionaban. Ahora `bootstrap.php` las registra en el log y la request continúa.
+- **Costo de bcrypt y versión de PHP.** Al principio hasheaba con `PASSWORD_DEFAULT`, cuyo costo pasó de 10 a 12 en PHP 8.4. El hash ficticio del login (para que un email inexistente tarde lo mismo) tenía costo 12: con PHP 8.2/8.3 los hashes reales serían de costo 10 y el tiempo de respuesta revelaría qué emails existen. Ahora el algoritmo y el costo son fijos y compartidos (D-35, hallazgo de la revisión A2-04).
 - **Parámetros como array.** `estado[]=x` provocaba un `TypeError` (500) al llegar a código tipado con `string`. `Request::string()` devuelve null si el valor no es string (hallazgo M3, D-27).
 
 ## Mejoras pendientes
 
-- Límite de intentos de login (D-22): no se implementó; no existe tabla `login_intentos` ni código asociado.
+- Límite de intentos de login (D-22): no se implementó; no existe tabla `login_intentos` ni código asociado. Hoy la única fricción ante fuerza bruta es el costo de bcrypt (12: unos 150 ms por verificación medidos en el equipo de desarrollo).
 - Historial de cambios de estado (quién, cuándo, de y a).
 - Paginación y búsqueda de texto en el listado (D-20).
 - `countByEstado()` con `GROUP BY` (D-34): hoy los contadores del listado se calculan en PHP sobre `Solicitud::all()`.

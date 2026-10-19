@@ -30,6 +30,8 @@ final class Session
         ini_set('session.use_strict_mode', '1');   // rechaza IDs que el servidor no emitió (fixation)
         ini_set('session.use_only_cookies', '1');
         ini_set('session.use_trans_sid', '0');
+        // El GC de PHP borra sesiones tras gc_maxlifetime (default 1440 s): nunca antes del timeout propio.
+        ini_set('session.gc_maxlifetime', (string) max($idleTimeout, 1440));
         session_name(self::NAME);
         session_set_cookie_params([
             'lifetime' => 0,

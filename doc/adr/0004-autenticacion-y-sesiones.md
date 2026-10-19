@@ -59,3 +59,29 @@ silencioso de bcrypt.
   intentos en 15 min). Hasta entonces el costo de bcrypt es la única fricción ante fuerza
   bruta.
 - Un solo rol: si aparecieran roles, `requireAdmin` pasaría a recibir el permiso requerido.
+
+## Revisión posterior (A2-04)
+
+La revisión adversarial de auth y panel encontró tres ajustes, incorporados sin cambiar la
+decisión:
+
+- **Costo de bcrypt fijo (D-35).** Las contraseñas se hashean con `PASSWORD_BCRYPT` y
+  `['cost' => 12]` (`Admin::HASH_ALGO` / `HASH_OPTIONS`), en el alta, en el rehash al
+  loguear y en el hash ficticio de `Auth`. Antes se usaba `PASSWORD_DEFAULT`, cuyo costo
+  pasó de 10 a 12 en PHP 8.4. Con PHP 8.2/8.3, los hashes reales (costo 10) y el ficticio
+  (costo 12) tardarían distinto, y el tiempo de respuesta revelaría qué emails existen,
+  anulando la anti-enumeración. Se fijó también el algoritmo, para que un cambio futuro de
+  `PASSWORD_DEFAULT` no reabra la diferencia.
+- **Contraseñas con byte NUL (D-36).** bcrypt corta en el primer `\0`, así que
+  `"correcta\0cualquiercosa"` verificaría como válida. Se rechazan igual que las de más de
+  72 bytes: fallo genérico en el login, `InvalidArgumentException` al crear o rehashear y
+  mensaje explícito en `crear-admin.php` (smoke H.16).
+- **Sesión (D-36).** `session.gc_maxlifetime` se fija en `max(app.session_timeout, 1440)`,
+  para que el recolector de PHP no borre sesiones antes del timeout documentado. Un
+  `POST /admin/login` con sesión activa redirige a `/admin` sin procesar credenciales.
+
+**Nota sobre el email del login:** la columna `email` usa `utf8mb4_unicode_ci`, así que la
+búsqueda no distingue mayúsculas ni acentos (`Admin@Example.com` encuentra a
+`admin@example.com`). No debilita la autenticación: igual hace falta la contraseña correcta
+de esa cuenta, y el `UNIQUE` con la misma collation impide dos cuentas que difieran solo en
+eso.
