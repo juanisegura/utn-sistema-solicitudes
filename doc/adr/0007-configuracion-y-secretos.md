@@ -55,3 +55,9 @@ la raíz del repo por error y reinstalar la DB de producción con datos demo.
   debe explicitar.
 - `public_html/.htaccess` y el de la raíz quedan acoplados: si se quita el
   `Require all granted`, el sitio responde 403.
+
+## Revisión posterior (R-3, D-58)
+
+La configuración se carga en un solo lugar por contexto: `app/bootstrap.php` (web) y
+`app/bootstrap-cli.php` (scripts y tests: Config y Database, sin sesión ni headers).
+`Database` ya no lee `config.php` por su cuenta: sin `configure()` lanza `LogicException`.

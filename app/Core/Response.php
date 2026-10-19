@@ -30,26 +30,36 @@ final class Response
         echo $html;
     }
 
-    /** Solo paths locales: evita open redirects si algún día el destino sale de la entrada. */
+    /**
+     * Redirect a un path local. Lanza HttpException (D-57): el flujo se corta igual que con exit,
+     * pero lo que sigue (sesión, buffers) termina normalmente y el despacho se puede testear.
+     * Solo paths locales: evita open redirects si algún día el destino sale de la entrada.
+     */
     public static function redirect(string $path, int $status = 302): never
     {
         // "/\evil.com" o con controles (CR/LF) los navegadores lo pueden interpretar como otro host.
         if (!str_starts_with($path, '/') || str_starts_with($path, '//') || preg_match('/[\\\\\x00-\x1F\x7F]/', $path) === 1) {
             throw new InvalidArgumentException('Redirect solo a paths locales.');
         }
-        header('Location: ' . $path, true, $status);
-        exit;
+        throw new HttpException($status, ['Location' => $path]);
     }
 
     /** @param array<string, string> $headers p. ej. ['Allow' => 'POST'] para el 405 */
     public static function abort(int $status, array $headers = []): never
     {
-        foreach ($headers as $name => $value) {
-            header($name . ': ' . $value);
+        throw new HttpException($status, $headers);
+    }
+
+    /** Emite un corte de flujo: redirect (sin cuerpo) o la vista de error del status. */
+    public static function send(HttpException $e): void
+    {
+        if ($e->isRedirect()) {
+            header('Location: ' . $e->headers['Location'], true, $e->status);
+
+            return;
         }
-        $view = isset(self::ERROR_TITLES[$status]) ? 'errors/' . $status : 'errors/500';
-        $title = self::ERROR_TITLES[$status] ?? self::ERROR_TITLES[500];
-        self::html(View::render($view, ['title' => $title]), $status);
-        exit;
+        $view = isset(self::ERROR_TITLES[$e->status]) ? 'errors/' . $e->status : 'errors/500';
+        $title = self::ERROR_TITLES[$e->status] ?? self::ERROR_TITLES[500];
+        self::html(View::render($view, ['title' => $title]), $e->status, $e->headers);
     }
 }

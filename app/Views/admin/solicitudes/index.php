@@ -20,10 +20,11 @@ use App\Models\Estado;
         <?php endif; ?>
         <label for="buscar" class="visually-hidden">Buscar por asunto, nombre, email o descripción</label>
         <input id="buscar" name="q" type="search" value="<?= e($q) ?>" maxlength="100"
-            placeholder="Buscar por asunto, nombre, email o descripción">
+            placeholder="Buscar por asunto, nombre, email o descripción" aria-describedby="buscar-ayuda">
         <button type="submit" class="btn">Buscar</button>
     </form>
 </div>
+<p id="buscar-ayuda" class="hint">Buscá por palabras: se encuentran palabras completas o por su comienzo («impre» encuentra «impresora»).</p>
 
 <dl class="stats">
     <div class="stat stat-total">

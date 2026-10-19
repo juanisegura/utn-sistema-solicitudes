@@ -8,8 +8,8 @@ La verificación local completa (`bash tests/run-all.sh`) da todo OK: 102 tests 
 
 ```text
 request → public_html/index.php      front controller (con php -S sirve solo estáticos reales de public_html/)
-        → app/bootstrap.php          manejo de errores, headers de seguridad, Config
-        → Router                     ruta: 404 · método: 405 + Allow
+        → app/bootstrap.php          manejo de errores, headers de seguridad, Config y Database
+        → Kernel → Router            RouteMatcher (puro): 404 · 405 + Allow
                                      → abre la sesión → auth (rutas /admin) → CSRF (todo POST)
         → Controller                 valida la entrada y decide la respuesta
         → Model                      único lugar con SQL (PDO con consultas preparadas)
@@ -19,11 +19,11 @@ request → public_html/index.php      front controller (con php -S sirve solo e
 | Capa | Archivos |
 |---|---|
 | Entrada y arranque | [public_html/index.php](../public_html/index.php), [app/bootstrap.php](../app/bootstrap.php), [app/routes.php](../app/routes.php) |
-| Núcleo (Router, Request, Response, Session, Csrf, Auth, LoginThrottle, Validator, View, Config, Log, Database) | [app/Core/](../app/Core/) |
+| Núcleo (Kernel, Router, RouteMatcher, Request, Response, Session, Csrf, Auth, LoginThrottle, Validator, View, Config, Log, Database) | [app/Core/](../app/Core/) |
 | Controllers finos, Models con SQL, Views sin lógica | [app/Controllers/](../app/Controllers/), [app/Models/](../app/Models/), [app/Views/](../app/Views/) |
 | CSS propio por responsabilidad (base, layout, components, pages), sin JS | [public_html/assets/css/](../public_html/assets/css/) |
 
-`public_html/` es el único DocumentRoot ([ADR-0001](adr/0001-mvc-ligero-front-controller.md)).
+`public_html/` es el único DocumentRoot ([ADR-0001](adr/0001-mvc-ligero-front-controller.md)). Los cortes de flujo (404, 419, redirects) se lanzan como `HttpException` y `Kernel` los emite en un solo punto: no hay `exit` en `app/`. Los scripts CLI usan `app/bootstrap-cli.php`, sin sesión ni headers.
 
 La presentación es mobile first, con paleta clara definida en tokens OKLCH y contraste AA verificado (texto 15,2:1, acento 5,8:1, badges ≥ 6,2:1). Todo es compatible con la CSP `'self'`: no hay estilos ni scripts inline. Las [capturas](pruebas/evidencias/capturas/) cubren desktop y mobile.
 
@@ -34,7 +34,7 @@ La presentación es mobile first, con paleta clara definida en tokens OKLCH y co
 | Tabla | Para qué | Detalles |
 |---|---|---|
 | `admins` | Administradores | `email` UNIQUE, `password_hash`, `activo` |
-| `solicitudes` | Solicitudes | `estado` ENUM, índice `(estado, created_at)` para el listado |
+| `solicitudes` | Solicitudes | `estado` ENUM, índice `(estado, created_at)` para el listado, índice `FULLTEXT` para la búsqueda |
 | `solicitud_eventos` | Historial de estados | FK a solicitud (CASCADE) y a admin (RESTRICT) |
 | `login_intentos` | Límite de intentos | IP + SHA-256 del email, nunca el email en claro |
 
@@ -52,12 +52,13 @@ El [seed](../database/seed.sql) trae un admin demo, ocho solicitudes ficticias (
 8. [Errores y códigos HTTP](adr/0008-errores-y-codigos-http.md): log con rotación y vista 500 genérica.
 9. [Límite de intentos de login](adr/0009-limite-intentos-login.md): por IP + email y por IP, exacto bajo concurrencia, con proxies de confianza.
 10. [Historial de estados en transacción](adr/0010-historial-estados-transaccion.md): con `SELECT … FOR UPDATE`.
+11. [Búsqueda FULLTEXT híbrida](adr/0011-busqueda-fulltext-hibrida.md): el índice prefiltra por palabras y un `LIKE` confirma la subcadena exacta.
 
 ## Seguridad
 
 | Requisito | Cómo se cumple | Verificado por |
 |---|---|---|
-| Inyección SQL | Preparación real (`EMULATE_PREPARES=false`). El estado solo entra como valor del enum. La búsqueda usa `LIKE ? ESCAPE ?` con `%`, `_` y `\` escapados, y `LIMIT`/`OFFSET` van como enteros bindeados | smoke P6.5, P7.4, P7.6, P7.7, B.2; unit LikeEscape |
+| Inyección SQL | Preparación real (`EMULATE_PREPARES=false`). El estado solo entra como valor del enum. La búsqueda usa `MATCH … AGAINST(?)` solo con palabras (sin operadores del usuario) y `LIKE ? ESCAPE ?` con `%`, `_` y `\` escapados. `LIMIT`/`OFFSET` van como enteros bindeados | smoke P6.5, P7.4, P7.6, P7.7, B.2; unit LikeEscape; integración FulltextBusqueda |
 | XSS | `e()` en toda salida; se guarda lo enviado y se escapa al mostrar; CSP `default-src 'self'` sin inline | P7.2–P7.5, B.3 |
 | Contraseñas | bcrypt costo 12 fijo, también en el hash ficticio que iguala tiempos si el email no existe; se rechazan las de más de 72 bytes o con byte NUL | P4.1, P4.2, H.16; unit Admin |
 | Fuerza bruta | 5 fallos por IP + email y 20 por IP en 15 min → 429 + `Retry-After`, sin verificar la contraseña. Intento reservado antes de contar, email canónico y comparación binaria; `X-Forwarded-For` solo desde `trusted_proxies` | L.1–L.4, L.6, L.7; integración LoginAtomicidad; unit RequestIp |
@@ -84,15 +85,14 @@ Los IDs corresponden a [tests/smoke.sh](../tests/smoke.sh) y a los archivos de [
 - El límite por cuenta se cuenta por IP + email: rotando direcciones (por ejemplo dentro de un /64 de IPv6) se obtienen contadores nuevos.
 - Detrás de un CDN sin `trusted_proxies`, todos los clientes comparten el límite por IP.
 - Si los scripts CLI y el servidor web corren con usuarios distintos, conviene crear `storage/logs/` con el usuario web; si no, el log cae a `error_log`.
+- Cuando el texto buscado tiene palabras indexables, la búsqueda es por palabra o prefijo: `ampus` ya no encuentra `campus` ([ADR-0011](adr/0011-busqueda-fulltext-hibrida.md)).
 - La compatibilidad con PHP 8.2 y MySQL 8.0 no se verifica automáticamente: no hay CI y todo se probó con PHP 8.5 y MariaDB 11.8.
 
 ## Mejoras pendientes
 
-- Índice `FULLTEXT` para la búsqueda: hoy `LIKE '%…%'` recorre toda la tabla.
-- Extraer un `RouteMatcher` y que `dispatch` devuelva un resultado en vez de terminar con `exit`.
-- `Database` todavía lee la configuración por su cuenta si nadie la configuró; unificarla en `Config`.
 - Agrupar IPv6 por /64 en el límite por IP.
 - `logrotate` en un servidor propio, en lugar de la rotación del código.
+- Buscar subcadenas dentro de palabras con índice: un índice de trigramas propio (MariaDB no tiene el parser `ngram` de MySQL).
 
 ---
 

@@ -10,9 +10,14 @@ if (PHP_SAPI !== 'cli') {
     exit;
 }
 
-require dirname(__DIR__) . '/app/autoload.php';
-
 use App\Models\Admin;
+
+try {
+    require dirname(__DIR__) . '/app/bootstrap-cli.php'; // Config + Database (D-58)
+} catch (Throwable $e) {
+    fwrite(STDERR, 'Error: ' . $e->getMessage() . "\n");
+    exit(1);
+}
 
 const PASSWORD_MIN = 12;
 // bcrypt (PASSWORD_DEFAULT) ignora lo que pasa de 72 bytes: se rechaza en vez de truncar en silencio.

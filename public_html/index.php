@@ -24,5 +24,4 @@ if (PHP_SAPI === 'cli-server') {
 
 require dirname(__DIR__) . '/app/bootstrap.php';
 
-$router = new App\Core\Router(require dirname(__DIR__) . '/app/routes.php');
-$router->dispatch(App\Core\Request::method(), App\Core\Request::path());
+App\Core\Kernel::handle(require dirname(__DIR__) . '/app/routes.php', App\Core\Request::method(), App\Core\Request::path());

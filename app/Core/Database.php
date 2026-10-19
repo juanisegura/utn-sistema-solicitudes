@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use LogicException;
 use PDO;
 use PDOException;
 use PDOStatement;
@@ -20,7 +21,7 @@ final class Database
     /** @var array<string, mixed>|null */
     private static ?array $config = null;
 
-    /** Permite inyectar la sección 'db' (p. ej. desde bootstrap); si no, se lee config.php. */
+    /** Sección 'db' de la config. La llaman bootstrap.php y bootstrap-cli.php (D-58); nadie más lee config.php. */
     public static function configure(array $dbConfig): void
     {
         self::$config = $dbConfig;
@@ -29,7 +30,13 @@ final class Database
 
     public static function pdo(): PDO
     {
-        return self::$pdo ??= self::connect(self::$config ?? self::loadConfig());
+        if (self::$config === null) {
+            throw new LogicException(
+                'Database no configurada: cargá app/bootstrap.php (web) o app/bootstrap-cli.php (CLI y tests) antes de usar la DB.'
+            );
+        }
+
+        return self::$pdo ??= self::connect(self::$config);
     }
 
     /** @return array<string, mixed>|null */
@@ -114,13 +121,5 @@ final class Database
         return defined('Pdo\Mysql::ATTR_FOUND_ROWS')
             ? constant('Pdo\Mysql::ATTR_FOUND_ROWS')
             : constant('PDO::MYSQL_ATTR_FOUND_ROWS');
-    }
-
-    /** @return array<string, mixed> */
-    private static function loadConfig(): array
-    {
-        $config = require dirname(__DIR__) . '/config/config.php';
-
-        return $config['db'];
     }
 }

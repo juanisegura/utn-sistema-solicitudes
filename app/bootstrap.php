@@ -7,6 +7,8 @@ declare(strict_types=1);
 
 use App\Core\Config;
 use App\Core\Database;
+use App\Core\HttpException;
+use App\Core\Response;
 use App\Core\Log;
 use App\Core\LoginThrottle;
 use App\Core\Request;
@@ -14,7 +16,7 @@ use App\Core\Session;
 use App\Core\View;
 
 require __DIR__ . '/autoload.php';
-require __DIR__ . '/helpers.php';
+require_once __DIR__ . '/helpers.php';
 
 const APP_ROOT = __DIR__ . '/..';
 const APP_LOG = APP_ROOT . '/storage/logs/app.log';
@@ -83,6 +85,12 @@ set_error_handler(static function (int $level, string $message, string $file, in
 });
 
 set_exception_handler(static function (Throwable $e) use (&$debug, $bufferBase): void {
+    // Un corte de flujo (abort/redirect) que escapó de Kernel::handle no es un error: se emite tal cual.
+    if ($e instanceof HttpException) {
+        Response::send($e);
+
+        return;
+    }
     app_log($e);
     app_render_500($e, $debug, $bufferBase);
 });
@@ -110,7 +118,7 @@ Config::configure($config);
 $debug = $config['app']['debug'];
 ini_set('display_errors', $debug ? '1' : '0');
 
-Database::configure($config['db']);
+Database::configure(Config::get('db'));
 
 Log::configure(APP_LOG, (int) $config['app']['log_max_bytes'], (int) $config['app']['log_max_archivos']);
 Request::configure($config['app']);

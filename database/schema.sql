@@ -36,7 +36,9 @@ CREATE TABLE solicitudes (
     updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     -- Cubre el listado del panel: filtro por estado ordenado por fecha.
-    KEY idx_estado_fecha (estado, created_at)
+    KEY idx_estado_fecha (estado, created_at),
+    -- Prefiltro de la búsqueda del panel (ADR-0011): mismas columnas que Solicitud::BUSCABLES.
+    FULLTEXT KEY ft_busqueda (asunto, nombre, email, descripcion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Intentos de login FALLIDOS para el límite de intentos (ADR-0009). Sin FK a admins: se

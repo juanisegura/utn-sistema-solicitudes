@@ -5,50 +5,35 @@ declare(strict_types=1);
 namespace App\Core;
 
 /**
- * Tabla de rutas → controller. Concentra en un solo lugar lo que no se puede olvidar en una
- * ruta nueva: método permitido (405 + Allow), sesión, autenticación y CSRF.
- *
- * Ruta: [método, patrón, [Controller::class, 'acción'], opciones]
- *   patrón: '/admin/solicitudes/{id}' — {id} solo acepta enteros positivos y llega a la acción como int.
- *   opciones: 'auth' => true exige admin; 'csrf' (default true en POST) valida el token.
+ * Despacho: resuelve la ruta (RouteMatcher) y aplica, en este orden, lo que no se puede olvidar
+ * en una ruta nueva: 404 / 405 + Allow → sesión → autenticación → CSRF → controller (D-16).
+ * Los cortes (404, 405, 419, redirect al login…) se lanzan como HttpException; los emite Kernel.
  */
 final class Router
 {
+    private readonly RouteMatcher $matcher;
+
     /** @param list<array{0: string, 1: string, 2: array{0: class-string, 1: string}, 3?: array<string, bool>}> $routes */
-    public function __construct(private readonly array $routes)
+    public function __construct(array $routes)
     {
+        $this->matcher = new RouteMatcher($routes);
     }
 
     public function dispatch(string $method, string $path): void
     {
-        // HEAD se atiende como GET (PHP descarta el cuerpo).
-        $method = $method === 'HEAD' ? 'GET' : $method;
-        $allowed = [];
-
-        foreach ($this->routes as $route) {
-            [$verb, $pattern, $handler] = $route;
-            $params = self::match($pattern, $path);
-            if ($params === null) {
-                continue;
-            }
-            if ($verb !== $method) {
-                $allowed[] = $verb;
-                continue;
-            }
-
-            // M-5: la sesión se abre recién acá; 404 y 405 no crean sesión ni mandan Set-Cookie.
-            Session::start();
-            $this->applyMiddleware($verb, $route[3] ?? []);
-            [$class, $action] = $handler;
-            (new $class())->$action(...$params);
-
-            return;
+        $match = $this->matcher->match($method, $path);
+        if ($match->status === 405) {
+            Response::abort(405, ['Allow' => implode(', ', $match->allow)]);
+        }
+        if ($match->status === 404) {
+            Response::abort(404);
         }
 
-        if ($allowed !== []) {
-            Response::abort(405, ['Allow' => self::allowHeader($allowed)]);
-        }
-        Response::abort(404);
+        // M-5: la sesión se abre recién acá; 404 y 405 no crean sesión ni mandan Set-Cookie.
+        Session::start();
+        $this->applyMiddleware($match->method, $match->options);
+        [$class, $action] = $match->handler;
+        (new $class())->$action(...$match->params);
     }
 
     /** @param array<string, bool> $options */
@@ -56,34 +41,11 @@ final class Router
     {
         // Auth antes que CSRF: sin sesión se redirige al login en vez de responder 419.
         if ($options['auth'] ?? false) {
-            Auth::requireAdmin(); // App\Core\Auth llega en A1-03
+            Auth::requireAdmin();
         }
         // Seguro por defecto: todo POST valida CSRF salvo que la ruta lo desactive explícitamente.
         if (($options['csrf'] ?? $verb === 'POST') && !Csrf::verify(Request::input(Csrf::FIELD))) {
             Response::abort(419);
         }
-    }
-
-    /** @return list<int>|null parámetros {id} si el path coincide, null si no */
-    private static function match(string $pattern, string $path): ?array
-    {
-        // D: "$" no acepta un "\n" final. {id} sin ceros a la izquierda ni 0 (ids AUTO_INCREMENT empiezan en 1).
-        $regex = '#^' . str_replace('\{id\}', '([1-9][0-9]{0,9})', preg_quote($pattern, '#')) . '$#D';
-        if (preg_match($regex, $path, $matches) !== 1) {
-            return null;
-        }
-
-        return array_map('intval', array_slice($matches, 1));
-    }
-
-    /** @param list<string> $methods */
-    private static function allowHeader(array $methods): string
-    {
-        $methods = array_values(array_unique($methods));
-        if (in_array('GET', $methods, true)) {
-            $methods[] = 'HEAD';
-        }
-
-        return implode(', ', $methods);
     }
 }

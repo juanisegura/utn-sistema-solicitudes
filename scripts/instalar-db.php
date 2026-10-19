@@ -13,8 +13,6 @@ if (PHP_SAPI !== 'cli') {
     exit;
 }
 
-require dirname(__DIR__) . '/app/autoload.php';
-
 use App\Core\Database;
 
 const TABLAS = ['admins', 'solicitudes', 'solicitud_eventos', 'login_intentos'];
@@ -59,7 +57,7 @@ if ($desconocidos !== []) {
 $conDatos = !in_array('--sin-datos', $args, true);
 
 try {
-    $config = require dirname(__DIR__) . '/app/config/config.php';
+    $config = require dirname(__DIR__) . '/app/bootstrap-cli.php'; // Config + Database (D-58)
 } catch (Throwable $e) {
     fwrite(STDERR, 'Error: ' . $e->getMessage() . "\n");
     exit(1);
@@ -70,8 +68,6 @@ if ($config['app']['env'] === 'production' && !in_array('--force', $args, true))
         . "php scripts/crear-admin.php (nunca el seed: su admin tiene password demo pública).\n");
     exit(1);
 }
-Database::configure($config['db']);
-
 $dirDb = dirname(__DIR__) . '/database';
 
 try {

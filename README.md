@@ -17,8 +17,9 @@ límite de intentos de login.
 **Panel administrativo** (`/admin`)
 - Login y logout de administrador, con **límite de intentos**: 5 fallos por IP + email
   y 20 por IP en 15 minutos → 429 con `Retry-After`.
-- Listado de la más reciente a la más antigua, con **búsqueda** por asunto, nombre, email
-  o descripción, **filtro por estado**, **contadores** y **paginación** (20 por página).
+- Listado de la más reciente a la más antigua, con **búsqueda** por palabras (palabra completa
+  o comienzo) en asunto, nombre, email o descripción con índice FULLTEXT, **filtro por estado**,
+  **contadores** y **paginación** (20 por página).
 - Detalle con cambio de estado e **historial**: quién lo cambió, cuándo y de qué estado a cuál.
 - Todas las páginas y operaciones del panel exigen sesión de administrador.
 
@@ -168,12 +169,13 @@ búsqueda y paginación, detalle con historial y 404) en
 
 ```text
 app/
-├── bootstrap.php      arranque: manejo de errores, headers de seguridad, Config, log
+├── bootstrap.php      arranque web: manejo de errores, headers de seguridad, Config, Database, log
+├── bootstrap-cli.php  arranque de scripts y tests: Config y Database, sin sesión ni headers
 ├── routes.php         tabla de rutas (método, patrón, controller, auth)
 ├── autoload.php       autoloader propio App\* → app/
 ├── config/            config.php (defaults seguros) + config.local.php (fuera de Git)
-├── Core/              Router, Request, Response, Session, Csrf, Auth, LoginThrottle, Validator,
-│                      View, Config, Log, Database
+├── Core/              Kernel, Router, RouteMatcher, Request, Response, Session, Csrf, Auth,
+│                      LoginThrottle, Validator, View, Config, Log, Database
 ├── Controllers/       controllers finos, sin SQL (público y Admin/)
 ├── Models/            único lugar con SQL: Solicitud, SolicitudEvento, Admin, LoginIntento, enum Estado
 └── Views/             layouts, formulario, panel, partials y páginas de error (todo escapado con e())

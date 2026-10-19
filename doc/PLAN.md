@@ -371,6 +371,9 @@ implementación, revisión adversarial, corrida oficial del orquestador.
 - Consecuencia aceptada: una subcadena **en medio** de una palabra (`ampus` en `campus`) ya
   no encuentra resultados cuando `q` tiene palabras indexables (la búsqueda pasa a ser por
   palabra/prefijo). Se documenta en la UI ("Buscá por palabras") y en el ADR.
+- Caracteres que InnoDB considera parte de una palabra pero el contrato no (`_` y `'`, D-59):
+  si `q` contiene alguno, se usa el fallback `LIKE` completo (no se parte la palabra), para
+  que el resultado siga siendo idéntico al de `LIKE`.
 - `countByEstado(q)` y `contar(q)` usan exactamente el mismo filtro.
 - Verificación: `EXPLAIN` muestra `type=fulltext` (o equivalente en MariaDB) con
   `key=ft_busqueda` para una búsqueda con palabras; resultados idénticos a la versión LIKE
@@ -385,7 +388,7 @@ implementación, revisión adversarial, corrida oficial del orquestador.
 - `Router::dispatch()` deja de terminar el proceso: usa `RouteMatcher`, aplica sesión →
   auth → CSRF y ejecuta el controller. Los cortes de flujo (`Response::abort()` y
   `Response::redirect()`) **lanzan** una excepción de control (`App\Core\HttpException` con
-  status y headers; `App\Core\RedirectException` o la misma con `Location`) en vez de
+  status y headers; la misma `HttpException` con `Location` e `isRedirect()`, D-59) en vez de
   `exit`. Un único punto (`public_html/index.php` o un `App\Core\Kernel::handle()`) las
   captura y emite la respuesta (vista de error o redirect). Ningún `exit`/`die` en `app/`
   salvo el front controller y los scripts CLI.

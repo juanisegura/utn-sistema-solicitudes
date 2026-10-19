@@ -39,3 +39,11 @@ conocimiento.
 - El evaluador corre el proyecto con `php -S` sin instalar nada más.
 - Router propio con soporte mínimo de parámetros (`{id}` numérico): si el proyecto
   creciera a decenas de rutas, evaluar FastRoute.
+
+## Revisión posterior (R-2, D-57)
+
+El despacho se separó en `RouteMatcher` (función pura: ruta, método y parámetros →
+`RouteMatch` con 200, 404 o 405 + Allow) y `Router` (sesión → auth → CSRF → controller). Los
+cortes de flujo (`Response::abort`, `Response::redirect`) lanzan `HttpException`, y
+`Kernel::handle()` las emite en un único punto: no hay `exit` en `app/`, y el despacho se
+testea sin procesos hijo.
