@@ -93,3 +93,19 @@ test('ningún exit/die en app/ (solo el front controller y los scripts CLI)', fu
     }
     assertSame([], $con, 'exit/die encontrados');
 });
+
+// A2-11 (hallazgo, informativo): HttpException no valida el status. Hoy redirect('/x', 200),
+// abort(302) o abort(999) se aceptan y Response::send emitiría un Location con 200 o la vista 500
+// con un 3xx. Ningún llamador lo hace (todos usan constantes), pero el contrato de D-57 es
+// "redirect = 3xx con Location; abort = error": se fija acá. FALLA hasta que se valide.
+test('redirect solo con status 3xx; abort solo con 4xx/5xx (InvalidArgumentException)', function () {
+    if (!hayHttpException()) {
+        pending('App\Core\HttpException no existe todavía (R-2, A1-13)');
+    }
+    foreach ([200, 204, 400, 500, 299, 400] as $s) {
+        assertThrows(InvalidArgumentException::class, fn () => Response::redirect('/x', $s), "redirect con {$s}");
+    }
+    foreach ([200, 302, 399, 600, 999, 0, -1] as $s) {
+        assertThrows(InvalidArgumentException::class, fn () => Response::abort($s), "abort con {$s}");
+    }
+});

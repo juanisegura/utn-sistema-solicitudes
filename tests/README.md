@@ -1,6 +1,6 @@
 # Tests (`tests/`)
 
-Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). Estado final: **102 unitarios, 11 de integración y 84 casos smoke**, en verde (la corrida oficial registrada en `doc/pruebas/PRUEBAS.md`) (`doc/pruebas/PRUEBAS.md`). La forma oficial de correr todo es **`bash tests/run-all.sh`** (sección "Corrida completa: run-all.sh" al final); no hay CI en GitHub (D-51).
+Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). Conteos tras la segunda fase de mejoras y su revisión (A2-11): **137 unitarios, 27 de integración y 84 casos smoke**; incluyen 3 regresiones de hallazgos de A2-11 que fallan hasta su fix. La corrida oficial vigente está en `doc/pruebas/PRUEBAS.md`. La forma oficial de correr todo es **`bash tests/run-all.sh`** (sección "Corrida completa: run-all.sh" al final); no hay CI en GitHub (D-51).
 
 # Smoke HTTP (`tests/smoke.sh`)
 
@@ -244,12 +244,13 @@ BASE_URL=http://localhost:8080 php tests/integration/run.php
 | `unit/SessionTimeoutTest.php` (7) | `Session` (**M-8**) | antes/después de vencer (manipulando `_last_activity`), ID nuevo y sesión vieja borrada, ventana deslizante, tiempo real 1 s, `gc_maxlifetime ≥ timeout` |
 | `unit/LikeEscapeTest.php` (4) | escape de LIKE (M-3) | `%`, `_`, `\` (la barra primero), multibyte |
 | `unit/RouteMatcherTest.php` (17) | `RouteMatcher` (R-2) | 200 con handler/params int/options, HEAD → GET, 404 (`{id}` con 0, ceros, > 10 dígitos, `\n`, `%0A`, `.` literal), 405 con `allow` (+HEAD), puro (sin `$_SERVER` ni salida), `RouteMatch` readonly, tabla real de `app/routes.php` |
-| `unit/DespachoTest.php` (9) | despacho sin `exit` (R-2) | `abort()`/`redirect()` lanzan `HttpException` con status, headers y `Location` sin emitir salida; redirect sigue rechazando destinos externos; `dispatch` 404/405 en proceso sin abrir sesión; ningún `exit`/`die` en `app/` (análisis de tokens) |
+| `unit/DespachoTest.php` (10) | despacho sin `exit` (R-2) | `abort()`/`redirect()` lanzan `HttpException` con status, headers y `Location` sin emitir salida; redirect sigue rechazando destinos externos; `dispatch` 404/405 en proceso sin abrir sesión; ningún `exit`/`die` en `app/` (análisis de tokens); redirect solo 3xx y abort solo 4xx/5xx (hallazgo A2-11, falla hasta el fix) |
 | `unit/DatabaseTest.php` (4) | `Database` (R-3) | sin `loadConfig`; `pdo()` y helpers sin `configure()` → `LogicException`; servidor inexistente → error genérico sin credenciales (cada caso en proceso hijo: estado estático) |
 | `unit/FulltextQueryTest.php` (11) | `Solicitud::fulltextQuery` (R-1) | `+palabra*` por palabra de ≥ 3 caracteres Unicode, dígitos, stopwords de InnoDB (`the`, `com`, `with`…), operadores booleanos neutralizados, separadores, `null` → fallback LIKE |
+| `unit/KernelTest.php` (5) | `Kernel::handle` (R-2) | `abort`/ruta inexistente → 404 con la vista, redirect → 302 sin cuerpo, una excepción real no se traga, acción normal sin código de error (en hijo: `send()` emite headers y salida) |
 | `integration/LoginAtomicidadTest.php` (3) | límite (M-1, D-46) | 4 fallos + ráfaga de 8 simultáneos → ≤ 1 verificado (401) y filas = previas + verificados ≤ 5; CSRF inválido no reserva; éxito no deja fila |
 | `integration/HistorialTransaccionTest.php` (8) | historial (M-2) | alta sin evento, evento con anterior/nuevo/admin, no-op sin evento, 422/404 sin evento, cambios simultáneos encadenados, FK CASCADE/RESTRICT, vista; PENDIENTE sin la tabla |
-| `integration/FulltextBusquedaTest.php` (10) | búsqueda híbrida (R-1) | índice `ft_busqueda` FULLTEXT de 4 columnas, `EXPLAIN` con `key=ft_busqueda`, prefijo, varias palabras, subcadena interna sin resultados (D-56), fallback LIKE (`%_`, `a_b`), confirmación de frase, guion bajo dentro de una palabra = LIKE, email completo, contadores = listado |
+| `integration/FulltextBusquedaTest.php` (13) | búsqueda híbrida (R-1) | índice `ft_busqueda` FULLTEXT de 4 columnas, `EXPLAIN` con `key=ft_busqueda`, prefijo, varias palabras, subcadena interna sin resultados (D-56), fallback LIKE (`%_`, `a_b`), confirmación de frase, guion bajo dentro de una palabra = LIKE, email completo, contadores = listado; prefijo de un token de más de 84 caracteres y variante acentuada de stopword (`cóm`) = LIKE (hallazgos A2-11, fallan hasta el fix); token de exactamente 84 |
 | `integration/ControlFlujoTest.php` (3) | control de flujo (R-2) y `bootstrap-cli` (R-3) | 404/405/419/401/redirects sin escribir `app.log` ni vista 500; `Allow` en el 405; `bootstrap-cli.php` deja la DB lista sin sesión, salida ni handlers |
 
 ## Corrida completa: `run-all.sh` (D-51)
@@ -258,6 +259,7 @@ BASE_URL=http://localhost:8080 php tests/integration/run.php
 bash tests/run-all.sh                 # servidor de prueba propio en 127.0.0.1:8090
 bash tests/run-all.sh --puerto 8095   # otro puerto (nunca 8080: es el de desarrollo)
 bash tests/run-all.sh --evidencia     # se lo pasa al smoke (doc/pruebas/evidencias/)
+bash tests/run-all.sh --continuar     # no corta en el primer fallo: corre todas las etapas (exit ≠ 0 si alguna falló)
 ```
 
 Etapas, en orden, cortando en el primer fallo: (1) `php -l` de `app/`, `public_html/`, `scripts/` y `tests/`; (2) unitarios; (3) `instalar-db`; (4) levanta un `php -S` propio con `PHP_CLI_SERVER_WORKERS=8` (concurrencia real para la ráfaga de M-1), espera a que responda y corre la integración con `SIN_SKIP=1`; (5) reinstala la DB y corre el smoke contra ese mismo servidor. Al salir (también si falla o con Ctrl+C) baja el servidor y su grupo de workers e imprime un resumen por etapa. Exit ≠ 0 si algo falló. No toca el servidor de desarrollo de `:8080` ni lee `config.local.php` (la DB la usa la app con su propia config). **Requiere turno exclusivo de DB** (D-42): borra y recrea las tablas; al terminar quedan el seed y las filas del smoke.

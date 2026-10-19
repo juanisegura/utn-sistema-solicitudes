@@ -5,7 +5,8 @@
 #   3. instalar-db (schema + seed)
 #   4. php -S propio con PHP_CLI_SERVER_WORKERS=8 + tests de integración (SIN_SKIP=1)
 #   5. instalar-db otra vez + smoke HTTP contra ese mismo servidor
-# Uso: bash tests/run-all.sh [--puerto N] [--evidencia] [-h]
+# Uso: bash tests/run-all.sh [--puerto N] [--evidencia] [--continuar] [-h]
+#   --continuar: no corta en el primer fallo; corre todas las etapas y sale ≠ 0 si alguna falló
 # No toca el servidor de desarrollo (:8080) ni lee app/config/config.local.php: la DB la usa la
 # app con su propia config. Requiere turno exclusivo de DB (D-42): borra y recrea las tablas.
 set -uo pipefail
@@ -13,13 +14,16 @@ set -uo pipefail
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PUERTO=8090
 EVIDENCIA=()
+CONTINUAR=0
+FALLAS=0
 WORKERS=8
 
-uso() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; }
+uso() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; }
 while (($#)); do
   case $1 in
     --puerto) [[ ${2:-} =~ ^[0-9]+$ ]] || { echo "--puerto requiere un número" >&2; exit 2; }; PUERTO=$2; shift 2 ;;
     --evidencia) EVIDENCIA=(--evidencia); shift ;;
+    --continuar) CONTINUAR=1; shift ;;
     -h|--help) uso; exit 0 ;;
     *) echo "Opción desconocida: $1" >&2; uso >&2; exit 2 ;;
   esac
@@ -69,7 +73,8 @@ etapa() {
     RESUMEN+=("OK     $nombre ($((fin - inicio)) s)")
   else
     RESUMEN+=("FALLÓ  $nombre (exit $codigo, $((fin - inicio)) s)")
-    exit 1
+    FALLAS=$((FALLAS + 1))
+    ((CONTINUAR)) || exit 1
   fi
 }
 
@@ -120,4 +125,8 @@ etapa "3. Instalar DB" php scripts/instalar-db.php
 etapa "4. Tests de integración ($BASE_URL)" integracion
 etapa "5a. Reinstalar DB (el smoke exige DB recién instalada)" php scripts/instalar-db.php
 etapa "5b. Smoke HTTP ($BASE_URL)" bash tests/smoke.sh --base-url "$BASE_URL" "${EVIDENCIA[@]}"
+if ((FALLAS > 0)); then
+  RESUMEN+=("$FALLAS etapa(s) fallaron (--continuar).")
+  exit 1
+fi
 RESUMEN+=("Todo OK. La DB quedó con el seed recién instalado + las filas del smoke (reinstalar si hace falta).")

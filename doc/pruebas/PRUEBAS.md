@@ -2,7 +2,7 @@
 
 Evidencia de las pruebas realizadas sobre el sistema de solicitudes (consigna §4) y de las verificaciones adicionales definidas en el PLAN (§3 y §5).
 
-**Corrida oficial vigente**: 2026-10-19 15:51, árbol del commit de cierre (código de `a34a0d8` + caso de TAB, D-50), DB recién reinstalada, `bash tests/run-all.sh --evidencia` → **todo OK**: sintaxis, 102 tests unitarios, 11 de integración y 84 casos smoke, sin fallas ni omitidos. Corrida hecha por el orquestador.
+**Corrida oficial vigente**: 2026-10-19 15:51, árbol del commit de cierre (código de `aa86133` + caso de TAB, D-50), DB recién reinstalada, `bash tests/run-all.sh --evidencia` → **todo OK**: sintaxis, 102 tests unitarios, 11 de integración y 84 casos smoke, sin fallas ni omitidos. Corrida hecha por el orquestador.
 Evidencia: [`evidencias/run-all-20261019-155152.txt`](evidencias/run-all-20261019-155152.txt) (salida completa de las cinco etapas) y [`evidencias/smoke-20261019-155159.txt`](evidencias/smoke-20261019-155159.txt) (smoke con `--evidencia`).
 
 Cómo reproducirla: `bash tests/run-all.sh` desde la raíz del repo (requiere la DB de desarrollo, que se borra y recrea; detalle en [`../../tests/README.md`](../../tests/README.md)).
@@ -58,12 +58,12 @@ El detalle de cada caso (ID → descripción) está en `tests/README.md`, secci�
 | M-7 tests y corrida local | este documento; `tests/run-all.sh` (no hay CI en GitHub, D-51) |
 | M-8 timeout de sesión | `unit/SessionTimeoutTest.php` |
 
-**Segunda fase de mejoras (R-1..R-3, PLAN §6)**: pruebas escritas contra el contrato (A2-10), pendientes de la corrida oficial de cierre. Con A1-13 en el árbol la suite unitaria pasa a **131** (los 12 casos de Router/redirect por Reflection o proceso hijo se reemplazan por 41 en proceso) y la de integración a **24**:
+**Segunda fase de mejoras (R-1..R-3, PLAN §6)**: pruebas escritas contra el contrato (A2-10), pendientes de la corrida oficial de cierre. Con A1-13 la suite unitaria pasa a **131** (los 12 casos de Router/redirect por Reflection o proceso hijo se reemplazan por 41 en proceso) y la de integración a **24**; la revisión A2-11 suma 6 unitarios (`KernelTest` y validación de status) y 3 de integración: **137 / 27**, con 3 regresiones de hallazgos que fallan hasta su fix (status sin validar en `HttpException`, prefijo de tokens de más de 84 caracteres, variante acentuada de stopword):
 
 | Mejora | Pruebas |
 |---|---|
 | R-1 búsqueda FULLTEXT híbrida (D-56) | `unit/FulltextQueryTest.php` (extracción de palabras, stopwords, operadores), `integration/FulltextBusquedaTest.php` (índice, `EXPLAIN`, prefijo, subcadena interna, fallback LIKE, contadores) y los casos B del smoke, que deben dar lo mismo que con LIKE |
-| R-2 `RouteMatcher` y despacho sin `exit` (D-57) | `unit/RouteMatcherTest.php`, `unit/DespachoTest.php` (incluye "ningún `exit` en `app/`"), `integration/ControlFlujoTest.php` (sin log ni vista 500 para 404/405/419/401/redirect) |
+| R-2 `RouteMatcher` y despacho sin `exit` (D-57) | `unit/RouteMatcherTest.php`, `unit/KernelTest.php`, `unit/DespachoTest.php` (incluye "ningún `exit` en `app/`"), `integration/ControlFlujoTest.php` (sin log ni vista 500 para 404/405/419/401/redirect) |
 | R-3 `Database` solo por `Config` (D-58) | `unit/DatabaseTest.php`, `integration/ControlFlujoTest.php` (`bootstrap-cli.php`) |
 
 **Fuera de la verificación automática** (D-51): la versión mínima PHP 8.2 y MySQL 8.0 (el desarrollo usa PHP 8.5 y MariaDB 11.8). Procedimiento manual con contenedores en `tests/README.md`, sección "Corrida completa: run-all.sh".
@@ -108,10 +108,11 @@ Corridas previas, durante el desarrollo. **No son la evidencia vigente** (ver "C
 |---|---|---|---|---|
 | 13:45 | Fase 1 + formulario; panel sin implementar | smoke 64: 19 PASS, 12 FAIL, 33 SKIP (rutas admin inexistentes) | exploratoria | — |
 | 13:59 | A1-03 (auth + panel) | smoke 67/67 | oficial de entonces (suite vieja) | [`evidencias/historial/smoke-20261019-135950.txt`](evidencias/historial/smoke-20261019-135950.txt) |
-| A2-04 | 7bb711d | smoke 68: 67 PASS, 1 FAIL (H.16, hallazgo después corregido en c710de5) | revisión | — |
-| A2-05 | c710de5 + límite de login sin commitear | smoke 72/72 | revisión | — |
+| A2-04 | e36056a | smoke 68: 67 PASS, 1 FAIL (H.16, hallazgo después corregido en 6005fcc) | revisión | — |
+| A2-05 | 6005fcc + límite de login sin commitear | smoke 72/72 | revisión | — |
 | A2-06, 14:21 | ídem + A1-07 en curso | smoke 73/74 | **inválida**: colisión con otra sesión en la DB (D-42) | — |
 | A2-07 | A1-09 sin commitear | unitarios 99/99; contra el commit previo sin A1-09: 56 PASS, 39 FAIL (los tests distinguen) | revisión | — |
-| A2-08, 15:05 | f09af47 + A1-11 sin commitear | run-all: todo OK (99 / 11 / 84) | revisión, árbol en curso | [`evidencias/historial/run-all-20261019-150507-verde.txt`](evidencias/historial/run-all-20261019-150507-verde.txt) |
-| A2-08, 15:06 | ídem + 2 tests de hallazgos | run-all corta en unitarios: 99 PASS, 2 FAIL (esperado hasta el fix de a34a0d8) | revisión, falla intencional | [`evidencias/historial/run-all-20261019-150635-con-hallazgos.txt`](evidencias/historial/run-all-20261019-150635-con-hallazgos.txt) |
-| 15:12 | a34a0d8 (fixes de A2-08) | run-all: todo OK (101 / 11 / 84) | oficial de entonces | [`evidencias/historial/run-all-20261019-151247.txt`](evidencias/historial/run-all-20261019-151247.txt), [`evidencias/historial/smoke-20261019-151255.txt`](evidencias/historial/smoke-20261019-151255.txt) |
+| A2-08, 15:05 | 33f0646 + A1-11 sin commitear | run-all: todo OK (99 / 11 / 84) | revisión, árbol en curso | [`evidencias/historial/run-all-20261019-150507-verde.txt`](evidencias/historial/run-all-20261019-150507-verde.txt) |
+| A2-08, 15:06 | ídem + 2 tests de hallazgos | run-all corta en unitarios: 99 PASS, 2 FAIL (esperado hasta el fix de aa86133) | revisión, falla intencional | [`evidencias/historial/run-all-20261019-150635-con-hallazgos.txt`](evidencias/historial/run-all-20261019-150635-con-hallazgos.txt) |
+| 15:12 | aa86133 (fixes de A2-08) | run-all: todo OK (101 / 11 / 84) | oficial de entonces | [`evidencias/historial/run-all-20261019-151247.txt`](evidencias/historial/run-all-20261019-151247.txt), [`evidencias/historial/smoke-20261019-151255.txt`](evidencias/historial/smoke-20261019-151255.txt) |
+| A2-11, 16:14 | f0ab4c0 + 523b622 + tests de A2-11 | `run-all --continuar`: unitarios 136/137 e integración 25/27 (las 3 fallas son las regresiones de hallazgos de A2-11, esperadas), smoke 84/84; smoke contra :8080 84/84 | revisión con hallazgos | [`evidencias/historial/run-all-20261019-161448-A2-11-hallazgos.txt`](evidencias/historial/run-all-20261019-161448-A2-11-hallazgos.txt), [`evidencias/historial/smoke-20261019-161458.txt`](evidencias/historial/smoke-20261019-161458.txt) |

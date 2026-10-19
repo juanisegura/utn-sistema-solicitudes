@@ -207,3 +207,46 @@ test('contadores con q coherentes con el listado (M-4 con el mismo filtro)', fun
         borrarFilas($ids);
     }
 });
+
+// A2-11 (hallazgo): InnoDB no indexa tokens de más de innodb_ft_max_token_size (84) caracteres.
+// Si la fila tiene una "palabra" más larga (hash, JWT, tramo de URL, base64) y q es su comienzo,
+// el MATCH no la ve y el híbrido da 0 mientras el LIKE la encuentra: falso negativo desde el
+// inicio de una palabra, fuera de la consecuencia aceptada de D-56 (subcadena en medio). FALLA hoy.
+test('prefijo de una palabra de más de 84 caracteres: mismo resultado que LIKE', function () {
+    requiereFulltext();
+    $m = marcaFt();
+    $largo = $m . str_repeat('ab12', 25);              // 108 caracteres sin separadores
+    $ids = filasFt(["Ver https://example.com/{$largo} en el navegador"]);
+    try {
+        assertSame(1, buscarPanel(adminFt(), substr($largo, 0, 16))[0], 'prefijo de un token no indexado');
+    } finally {
+        borrarFilas($ids);
+    }
+});
+
+test('palabra de exactamente 84 caracteres: su prefijo sí la encuentra (borde indexado)', function () {
+    requiereFulltext();
+    $m = marcaFt();
+    $tok = $m . str_repeat('k', 84 - strlen($m));
+    $ids = filasFt(["Hash {$tok}"]);
+    try {
+        assertSame(1, buscarPanel(adminFt(), substr($tok, 0, 16))[0]);
+    } finally {
+        borrarFilas($ids);
+    }
+});
+
+// A2-11 (hallazgo): el descarte de prefijos de stopwords compara con acentos, pero el índice usa
+// utf8mb4_unicode_ci (sin acentos): "cóm"/"thé" quedan como términos obligatorios y la stopword
+// "com"/"the" no está indexada → 0 filas, mientras el LIKE (también sin acentos) las encuentra.
+// FALLA hoy.
+test('variante acentuada de una stopword ("cóm") no excluye filas que el LIKE encuentra', function () {
+    requiereFulltext();
+    $m = marcaFt();
+    $ids = filasFt(["Dominio .com {$m}"]);
+    try {
+        assertSame(1, buscarPanel(adminFt(), "cóm {$m}")[0]);
+    } finally {
+        borrarFilas($ids);
+    }
+});
