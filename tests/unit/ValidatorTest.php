@@ -120,3 +120,21 @@ test('solo se devuelven los campos con reglas', function () {
     [$data] = validar(['nombre' => 'Ana', 'extra' => 'x'], REGLAS_LINEA);
     assertSame(['nombre'], array_keys($data));
 });
+
+// A2-08 (hallazgo): el recorte es O(n²) con una corrida larga de espacios que no está al final
+// (la alternativa "[…]+$" se reintenta desde cada posición). Con pcre.jit=0 —como en este
+// equipo— 20 000 espacios internos tardan ~2,4 s por request y 40 000 ~10 s, sin login (form
+// público). Se fuerza jit=0 para que el caso no dependa del php.ini.
+test('recorte lineal: 20 000 espacios internos sin pcre.jit en < 0,5 s', function () {
+    $antes = ini_get('pcre.jit');
+    ini_set('pcre.jit', '0');
+    try {
+        $t = hrtime(true);
+        [, $err] = validar(['desc' => 'a' . str_repeat(' ', 20000) . 'a'], ['desc' => ['required', 'multiline', 'max:5000']]);
+        $seg = (hrtime(true) - $t) / 1e9;
+    } finally {
+        ini_set('pcre.jit', (string) $antes);
+    }
+    assertContains('como máximo 5000', $err['desc'] ?? '', 'igual se rechaza por largo');
+    assertTrue($seg < 0.5, sprintf('tardó %.2f s', $seg));
+});

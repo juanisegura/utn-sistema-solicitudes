@@ -35,12 +35,15 @@ Las columnas "Resultado obtenido" y "Evidencia" se completan al ejecutar contra 
 | Entrada malformada: UTF-8 inválido (H.14) y espacios Unicode (P2.5) | H.14, P2.5 | 422, nunca 500 ni alta | | |
 | Archivos ocultos bajo php -S (H.15) | H.15 | GET /.htaccess → 403/404 | | |
 | Límite de intentos (D-38, D-41) | L.1 a L.4, L.6, L.7 | 5 fallos → 401; 6.º → 429 + Retry-After + "Demasiados intentos" (cuenta inexistente y admin, este con la password correcta); POST sin CSRF → 419 sin contar; una cuenta bloqueada no frena a otra desde la misma IP; con el admin bloqueado, variantes con acento + password correcta → 401/429 (L.6); email en mayúsculas sigue entrando (L.7) | | |
+| Búsqueda y paginación (M-3) | B.1 a B.7 | búsqueda propia de la corrida (21 filas, 2 páginas); `%` y `_` literales; `q` reflejado escapado; `q` y `pagina` inválidos → 400; página fuera de rango → 404; links conservan `q` y `estado` | | |
+| Historial (M-2) | B.8 | el detalle muestra el cambio de P5; un POST al mismo estado no agrega evento | | |
+| Sesión perezosa (M-5) | B.9 | 404, 405, estáticos e id inválido sin `Set-Cookie` | | |
 | Password con NUL (H.16) | H.16 | password correcta + %00 + sufijo en el login → 401 y /admin sigue en 302 (bcrypt ignora lo que sigue al NUL) | | |
 | Parámetros como array (H.12, H.13, P6.8) | H.12, H.13, P6.8 | nombre[] en el formulario público 422 (H.12); ?estado[] 400 (H.13); estado[] en el cambio de estado 422 (P6.8); sin fugas de error ni 500 | | |
 
-## Tests automatizados (unitarios, integración, CI)
+## Tests automatizados (unitarios e integración)
 
-Además del smoke HTTP hay tests unitarios (`php tests/unit/run.php`, sin DB ni red) e integración (`php tests/integration/run.php`, contra la DB y la app), con un runner propio sin dependencias (D-48). El detalle por archivo está en `tests/README.md`, sección "Tests unitarios, integración y CI". El CI de GitHub Actions corre sintaxis, unitarios, integración y smoke con PHP 8.2 y 8.5 sobre MySQL 8.0.
+Además del smoke HTTP hay tests unitarios (`php tests/unit/run.php`, sin DB ni red) e integración (`php tests/integration/run.php`, contra la DB y la app), con un runner propio sin dependencias (D-48). El detalle por archivo está en `tests/README.md`, sección "Tests unitarios, integración y CI". Todo (sintaxis, unitarios, integración y smoke) se corre localmente con `bash tests/run-all.sh` (D-51: no hay CI en GitHub). PHP 8.2 y MySQL 8.0 no se verifican automáticamente; el procedimiento manual está en `tests/README.md`.
 
 | Mejora | Cubierta por | Resultado esperado |
 |---|---|---|
@@ -87,3 +90,5 @@ Comportamiento con JavaScript deshabilitado: no aplica, la aplicación no usa JS
 | 2026-10-19 14:20 | Commit 7bb711d (auth + panel), DB recién reinstalada (A2-04) | 68 casos: 67 PASS, 1 FAIL (H.16, hallazgo nuevo de A2-04: login acepta password + NUL + sufijo), 0 SKIP | sin archivo (corrida de revisión) |
 | 2026-10-19 16:50 | c710de5 + A1-06 sin commitear (límite de login), DB recién reinstalada (A2-05) | 72 casos: 72 PASS, 0 FAIL, 0 SKIP | sin archivo (corrida de revisión) |
 | 2026-10-19 18:40 | A1-09 en el árbol sin commitear (M-1, M-5, M-6) + `escapeLike` de A1-10 (A2-07) | Unitarios: 99 tests, 99 PASS. Los mismos tests contra `HEAD` sin A1-09: 56 PASS, 39 FAIL (todos los de M-1, M-5, M-6 y M-8), 4 PENDIENTE. Integración y smoke: no ejecutados (sin turno de DB, D-42) | sin archivo |
+| 2026-10-19 15:05 | Árbol actual (f09af47 + 4b12373 + A1-11 sin commitear) con los casos B (A2-08), antes de los 2 tests de hallazgos | `run-all.sh`: sintaxis OK, unitarios 99/99, integración 11/11 (8 workers), smoke 84/84 | `evidencias/run-all-20261019-150507-verde.txt` |
+| 2026-10-19 15:06 | Ídem + 2 tests unitarios de hallazgos de A2-08 (recorte cuadrático, rotación que lanza) | `run-all.sh` corta en la etapa 2: 101 tests, 99 PASS, 2 FAIL (los dos hallazgos, esperado hasta el fix) | `evidencias/run-all-20261019-150635-con-hallazgos.txt` |

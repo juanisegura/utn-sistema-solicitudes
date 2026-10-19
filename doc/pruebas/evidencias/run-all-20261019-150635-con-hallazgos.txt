@@ -1,0 +1,133 @@
+
+######## 1. Sintaxis (php -l) ########
+php -l: 0 archivo(s) con errores
+
+######## 2. Tests unitarios ########
+Tests unitarios — 101 tests
+
+== AdminTest ==
+PASS  normalizeEmail: recorta y pasa a minúsculas
+PASS  normalizeEmail: minúsculas multibyte (mb_strtolower, no strtolower)
+PASS  normalizeEmail: no quita acentos (ádmin ≠ admin, D-41)
+PASS  normalizeEmail: idempotente
+PASS  passwordAcceptable: hasta 72 bytes sí, 73 no
+PASS  passwordAcceptable: cuenta bytes, no caracteres (36 "ñ" = 72 bytes)
+PASS  passwordAcceptable: NUL en cualquier posición → false
+PASS  passwordAcceptable: password común → true
+PASS  hash fijo: bcrypt costo 12 (D-35, D-37), independiente de PASSWORD_DEFAULT
+PASS  el hash ficticio de Auth tiene el mismo algoritmo y costo que los reales
+
+== CsrfTest ==
+PASS  token() sin sesión iniciada → LogicException
+PASS  verify: token correcto → true
+PASS  verify: null, vacío y otro token → false
+PASS  verify: sin token en la sesión nunca valida (ni el vacío)
+PASS  verify: token guardado no-string (sesión corrupta) → false
+PASS  verify: el parámetro tipado rechaza arrays (TypeError, no true)
+PASS  rotate: el token anterior deja de valer
+PASS  token(): 64 hex, estable dentro de la sesión y nuevo tras rotate (en proceso hijo)
+
+== EstadoTest ==
+PASS  fromInput: los tres valores válidos
+PASS  fromInput: null y vacío → null
+PASS  fromInput: recorta espacios
+PASS  fromInput: mayúsculas, etiquetas y valores fuera de lista → null
+PASS  los valores del enum coinciden con el ENUM de la tabla
+PASS  label() legible para cada caso
+
+== LikeEscapeTest ==
+PASS  texto sin comodines queda igual
+PASS  % y _ se escapan
+PASS  la barra se escapa primero (no se duplica el escape de % y _)
+PASS  multibyte intacto
+
+== LogTest ==
+PASS  write agrega la línea con "\n" y crea el archivo
+PASS  no rota mientras no SUPERA el máximo (igual al máximo no rota)
+PASS  rota antes de escribir cuando el archivo supera el máximo
+PASS  corrimiento .1 → .2 … y descarte del más viejo (maxArchivos = 2)
+PASS  con maxArchivos = 5 no aparece app.log.6
+PASS  dos procesos escribiendo a la vez: sin líneas perdidas, duplicadas ni mezcladas (flock)
+FAIL  una rotación que falla no hace lanzar a write (corre dentro del exception handler)  — ErrorException: rename(/tmp/utn-test-92db1b9701d5/app.log,/tmp/utn-test-92db1b9701d5/app.log.1): Is a directory (Log.php:68)
+
+== RequestIpTest ==
+PASS  sin proxies configurados: X-Forwarded-For se ignora
+PASS  sin clave trusted_proxies en la config: equivale a lista vacía
+PASS  proxy de confianza: devuelve el cliente que agregó
+PASS  XFF desde una IP NO confiable (falsificado) → REMOTE_ADDR
+PASS  el cliente falsifica la izquierda del XFF: se lee de derecha a izquierda
+PASS  cadena de dos proxies de confianza
+PASS  proxy por CIDR IPv4
+PASS  CIDR /32 y /0 en los bordes
+PASS  IPv6: proxy exacto (::1) y por CIDR
+PASS  IPv4 y IPv6 no se confunden entre sí
+PASS  header ausente o vacío con proxy de confianza → REMOTE_ADDR
+PASS  header inválido → REMOTE_ADDR
+PASS  (a) todas las entradas son de confianza → la de más a la izquierda
+PASS  (b) inválida antes de una no confiable (derecha a izquierda) → REMOTE_ADDR
+PASS  (b) una inválida más a la izquierda de la no confiable no importa
+PASS  (c) espacios alrededor de cada entrada
+PASS  (c) puerto en IPv4 y corchetes/puerto en IPv6
+PASS  (c) proxy con puerto en el XFF también se reconoce como de confianza
+PASS  (c) IPv4-mapped en XFF: se devuelve como IPv4
+PASS  (c) IPv4-mapped en REMOTE_ADDR matchea un CIDR IPv4 (y se devuelve como IPv4)
+PASS  (c) entrada IPv4-mapped de un proxy confiable se saltea
+PASS  (d) entrada inválida en trusted_proxies → InvalidArgumentException
+PASS  (d) trusted_proxies que no es lista de strings → InvalidArgumentException
+PASS  sin REMOTE_ADDR → cadena vacía (CLI), sin warnings
+
+== ResponseTest ==
+PASS  redirect rechaza destinos que no son paths locales
+PASS  redirect a un path local → 302 y termina (proceso hijo)
+PASS  redirect con código explícito (303)
+
+== RouterTest ==
+PASS  match: ruta fija exacta
+PASS  match: {id} entero positivo llega como int
+PASS  match: {id} rechaza 0, ceros a la izquierda, signos, no numéricos y > 10 dígitos
+PASS  match: $D — un "\n" final no matchea
+PASS  match: el patrón se escapa (un "." en el patrón no es comodín)
+PASS  allowHeader: agrega HEAD cuando hay GET y deduplica
+PASS  dispatch: ruta inexistente → 404 sin ejecutar acciones
+PASS  dispatch: método no permitido → 405 sin ejecutar acciones
+PASS  dispatch: GET con {id} llega como int a la acción
+PASS  dispatch: HEAD se atiende con la ruta GET
+PASS  M-5: 404 no inicia sesión
+PASS  M-5: 405 no inicia sesión
+PASS  M-5: con ruta y método resueltos, la acción ya corre con sesión activa
+PASS  M-5: también en POST (el CSRF necesita la sesión)
+
+== SessionTimeoutTest ==
+PASS  antes de vencer (59 s de 60): conserva datos e ID
+PASS  después de vencer (61 s de 60): se vacía y cambia el ID
+PASS  después de vencer, la actividad se vuelve a registrar (la sesión nueva no nace vencida)
+PASS  cada request renueva la actividad (ventana deslizante)
+PASS  tiempo real: timeout 1 s y 2 s de espera → vencida
+PASS  tiempo real: timeout 5 s sin espera → vigente
+PASS  gc_maxlifetime ≥ timeout (D-36): el GC no corta antes
+
+== ValidatorTest ==
+PASS  UTF-8 inválido → error "no válidos" y el valor no se re-muestra
+PASS  UTF-8 truncado (\xC3\x28) también se rechaza
+PASS  recorta espacios Unicode (NBSP, ZWSP, BOM, U+3000) en los extremos
+PASS  no recorta espacios internos
+PASS  solo espacios Unicode con required → obligatorio
+PASS  campo ausente con required → obligatorio
+PASS  vacío sin required → sin error
+PASS  controles (NUL, ESC, DEL, BEL) se rechazan en una línea
+PASS  CR y LF internos se rechazan en un campo de una línea
+PASS  multiline acepta \n, \r\n y \t internos
+PASS  multiline sigue rechazando NUL, VT, FF y ESC
+PASS  max cuenta caracteres, no bytes (ñ y emoji)
+PASS  max se aplica después del recorte
+PASS  email válido e inválido
+PASS  un error por campo: el primero de la lista de reglas
+PASS  regla desconocida → InvalidArgumentException (error de programación)
+PASS  solo se devuelven los campos con reglas
+FAIL  recorte lineal: 20 000 espacios internos sin pcre.jit en < 0,5 s  — tardó 2.46 s: esperado true, obtenido false
+
+Resumen: 101 tests — 99 PASS, 2 FAIL, 0 PENDIENTE, 0 SKIP
+
+== Resumen de run-all ==
+OK     1. Sintaxis (php -l) (2 s)
+FALLÓ  2. Tests unitarios (exit 1, 6 s)

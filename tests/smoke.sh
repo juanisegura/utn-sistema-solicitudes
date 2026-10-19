@@ -97,6 +97,9 @@ header() { grep -i "^$1:" "$HDRS" | tail -1 | cut -d: -f2- | tr -d '\r' | sed 's
 loc() { header Location | sed -E 's#^https?://[^/]+##'; }
 has()  { grep -Eiq -- "$1" "$BODY" && echo sí || echo no; }
 hasF() { grep -Fq -- "$1" "$BODY" && echo sí || echo no; }
+# hasT: como hasF pero sobre el texto visible: ignora <wbr> (cortes de línea sugeridos, p. ej. en
+# emails largos del detalle), que parten el dato en el HTML sin cambiar lo que se ve.
+hasT() { sed 's/<wbr>//g' "$BODY" | grep -Fq -- "$1" && echo sí || echo no; }
 fuga() { grep -Eiq -- "$RE_FUGA" "$BODY" && echo sí || echo no; }
 
 # Token CSRF del primer <input name="$CSRF_FIELD"> del HTML
@@ -264,7 +267,7 @@ if ((ADMIN_OK)); then
   if [[ -n $ID ]]; then
     req "$J_ADM" GET "/admin/solicitudes/$ID"
     check P1.6 "detalle persistido (asunto, email, descripción)" "200 sí sí sí" \
-      "$CODE $(hasF "Valida $MARCA") $(hasF ana@example.com) $(hasF "Descripción de prueba $MARCA")"
+      "$CODE $(hasT "Valida $MARCA") $(hasT ana@example.com) $(hasT "Descripción de prueba $MARCA")"
   else
     skip "sin ID de la solicitud válida" P1.6
   fi
@@ -401,6 +404,108 @@ if ((ADMIN_OK)); then
 else
   skip "sin sesión de admin" H.13
 fi
+
+seccion "B — Búsqueda, paginación, historial y sesión perezosa (M-2, M-3, M-5)"
+# Filas propias de la corrida por el formulario público (no dependen del seed): 21 con
+# "pag-<MARCA>" (2 páginas de 20) y 2 para el escape de comodines de LIKE. Sin logins fallidos:
+# no cambia el presupuesto por IP. Usa la sesión de admin antes del logout de S.
+PAG="pag-$MARCA"
+ESC_SI="escA-$MARCA-a%b_c" ESC_NO="escB-$MARCA-aZZbYc"
+req "$J_PUB" GET /
+T_B=$(csrf_de "$BODY")
+CODES_ALTA=""
+for i in $(seq -w 1 21); do
+  post "$J_PUB" /solicitudes "$CSRF_FIELD=$T_B" "$F_NOMBRE=Paginación $i" "$F_EMAIL=pag$i@example.com" \
+    "$F_ASUNTO=$PAG fila $i" "$F_DESC=Fila $i para la paginación de la corrida"
+  CODES_ALTA+="$CODE "
+done
+for asunto in "$ESC_SI" "$ESC_NO"; do
+  post "$J_PUB" /solicitudes "$CSRF_FIELD=$T_B" "$F_NOMBRE=Comodines" "$F_EMAIL=comodin@example.com" \
+    "$F_ASUNTO=$asunto" "$F_DESC=Escape de LIKE"
+  CODES_ALTA+="$CODE "
+done
+[[ $CODES_ALTA =~ ^(302\ ){23}$ ]] || echo "AVISO: altas de la sección B: $CODES_ALTA"
+# n_items <regex> → cantidad de líneas del BODY que matchean
+n_items() { grep -Ec -- "$1" "$BODY" || true; }
+
+if ((ADMIN_OK)); then
+  req "$J_ADM" GET "/admin?q=$(urlenc "$PAG")"
+  check B.1 "búsqueda q=pag-<marca> → 200, 21 resultados, página 1 con 20 filas" "200 sí 20" \
+    "$CODE $(has "21 resultados para «$PAG»") $(n_items "data-label=\"Asunto\".*$PAG fila")"
+
+  req "$J_ADM" GET "/admin?q=$(urlenc "-$MARCA-a%b_c")"
+  check B.2 "q con % y _ literales: encuentra «a%b_c» y no «aZZbYc» (comodines escapados)" "200 sí no" \
+    "$CODE $(hasF "escA-$MARCA-a%b_c") $(hasF "escB-$MARCA")"
+
+  req "$J_ADM" GET "/admin?q=$(urlenc "<script>alert('b3')</script>")"
+  check B.3 "q=<script> reflejado escapado (estado, caption e input), nunca crudo" "200 sí sí no" \
+    "$CODE $(hasF "«&lt;script&gt;alert(&#039;b3&#039;)&lt;/script&gt;»") $(hasF "value=\"&lt;script&gt;alert(&#039;b3&#039;)&lt;/script&gt;\"") $(hasF "<script>alert('b3')")"
+
+  B4=""
+  for q in "q=$(printf 'x%.0s' $(seq 1 101))" "q=%FFabc" "q=a%01b" "q=a%0Ab" "q[]=x"; do
+    req "$J_ADM" GET "/admin?$q"
+    B4+="$CODE$( [[ $(fuga) == no ]] || echo +fuga) "
+  done
+  check B.4 "q inválido (101 caracteres, UTF-8 inválido, control, salto de línea, array) → 400 sin fugas" \
+    "400 400 400 400 400" "${B4% }"
+  req "$J_ADM" GET "/admin?q=$(printf 'x%.0s' $(seq 1 100))"
+  check B.4b "q de exactamente 100 caracteres → 200" "200" "$CODE"
+
+  B5=""
+  for pg in 0 abc 01 -1 1.5 '%20' 1e2; do
+    req "$J_ADM" GET "/admin?q=$(urlenc "$PAG")&pagina=$pg"
+    B5+="$CODE "
+  done
+  req "$J_ADM" GET "/admin?pagina[]=2"
+  B5+="$CODE"
+  check B.5 "pagina 0, abc, 01, -1, 1.5, espacio, 1e2, array → 400" \
+    "400 400 400 400 400 400 400 400" "$B5"
+
+  req "$J_ADM" GET "/admin?q=$(urlenc "$PAG")&pagina=2"
+  B6="$CODE $(n_items "data-label=\"Asunto\".*$PAG fila") $(has 'Página 2 de 2')"
+  req "$J_ADM" GET "/admin?q=$(urlenc "$PAG")&pagina=3"
+  B6+=" $CODE"
+  req "$J_ADM" GET "/admin?q=$(urlenc "$PAG")&pagina=999999999"
+  B6+=" $CODE"
+  req "$J_ADM" GET "/admin?q=$(urlenc "sin-resultados-$MARCA")&pagina=3"
+  B6+=" $CODE $(has 'No hay solicitudes que coincidan')"
+  check B.6 "pagina=2 → 1 fila «Página 2 de 2»; pagina=3 y 999999999 → 404; sin resultados, pagina=3 → 200 vacío" \
+    "200 1 sí 404 404 200 sí" "$B6"
+
+  req "$J_ADM" GET "/admin?estado=pendiente&q=$(urlenc "$PAG")"
+  QENC=$(urlenc "$PAG")
+  check B.7 "links de paginación y de filtros conservan q y estado (escapados con &amp;)" "200 sí sí sí" \
+    "$CODE $(hasF "href=\"/admin?estado=pendiente&amp;q=$QENC&amp;pagina=2\"") $(hasF "href=\"/admin?estado=resuelta&amp;q=$QENC\"") $(hasF "href=\"/admin?q=$QENC\"")"
+
+  if [[ -n $ID && -n $T_ADM ]]; then
+    req "$J_ADM" GET "/admin/solicitudes/$ID"
+    N_ANTES=$(n_items 'class="timeline-item')
+    HIST="$(has 'Historial de estados') $(has 'badge-pendiente">Pendiente</span>') $N_ANTES"
+    post "$J_ADM" "/admin/solicitudes/$ID/estado" "$CSRF_FIELD=$T_ADM" "$F_ESTADO=en_proceso"
+    HIST+=" $CODE"
+    req "$J_ADM" GET "/admin/solicitudes/$ID"
+    HIST+=" $(n_items 'class="timeline-item') $(has "$RE_FLASH_ESTADO")"
+    check B.8 "historial visible tras P5 (1 evento pendiente→en proceso); no-op al mismo estado → 302 + flash, sin evento nuevo" \
+      "sí sí 1 302 1 sí" "$HIST"
+  else
+    skip "sin ID o token de admin" B.8
+  fi
+else
+  skip "sin sesión de admin" B.1 B.2 B.3 B.4 B.4b B.5 B.6 B.7 B.8
+fi
+
+# B.9 — M-5: 404, 405 y estáticos no crean sesión (sin Set-Cookie); una ruta resuelta sí
+B9=""
+for ruta in "GET /no-existe-$MARCA" "GET /solicitudes" "GET /assets/css/base/tokens.css" "GET /admin/solicitudes/0"; do
+  nuevo_jar
+  req "$J_NUEVO" ${ruta%% *} "${ruta#* }"
+  B9+="$CODE:$( [[ -z $(header Set-Cookie) ]] && echo sin || echo con) "
+done
+nuevo_jar
+req "$J_NUEVO" GET /
+B9+="$CODE:$( [[ -n $(header Set-Cookie) ]] && echo con || echo sin)"
+check B.9 "404, 405, estático e id inválido sin Set-Cookie; GET / sí crea sesión (M-5)" \
+  "404:sin 405:sin 200:sin 404:sin 200:con" "$B9"
 
 seccion "S — Logout"
 if ((ADMIN_OK)) && [[ -n $T_ADM ]]; then

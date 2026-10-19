@@ -127,3 +127,31 @@ test('dos procesos escribiendo a la vez: sin líneas perdidas, duplicadas ni mez
     assertSame(600, count(array_unique($lineas)), 'sin duplicados');
     assertTrue(count(archivosLog($dir)) >= 4, 'hubo rotaciones durante la escritura concurrente');
 });
+
+// A2-08 (hallazgo): si la rotación falla (rename sobre un destino que no se puede pisar), el
+// warning se convierte en excepción por el handler de bootstrap y, como Log::write corre dentro
+// del exception handler, se pierde el error original y la vista 500. Write no debe lanzar: la
+// línea tiene que quedar escrita (en el archivo o, como último recurso, en error_log).
+test('una rotación que falla no hace lanzar a write (corre dentro del exception handler)', function () {
+    $dir = dirTemporal();
+    $archivo = $dir . '/app.log';
+    Log::configure($archivo, 5, 2);
+    file_put_contents($archivo, str_repeat('x', 50));         // ya supera el máximo → rota
+    mkdir($archivo . '.1');                                  // destino .1 = directorio no vacío
+    file_put_contents($archivo . '.1/ocupado', 'x');
+    $previo = set_error_handler(static function (int $n, string $m, string $f, int $l): bool {
+        if ((error_reporting() & $n) === 0) {                  // igual que app/bootstrap.php:
+            return false;                                      // respeta "@"…
+        }
+        throw new ErrorException($m, 0, $n, $f, $l);           // …y el resto se vuelve excepción
+    });
+    $errorLog = ini_set('error_log', $dir . '/php-error.log');
+    try {
+        Log::write('linea-tras-fallo');
+    } finally {
+        set_error_handler($previo);
+        ini_set('error_log', (string) $errorLog);
+    }
+    $todo = (string) @file_get_contents($archivo) . (string) @file_get_contents($dir . '/php-error.log');
+    assertContains('linea-tras-fallo', $todo, 'la línea no se pierde');
+});

@@ -13,7 +13,7 @@ declare(strict_types=1);
  * excepción); queda PENDIENTE si llama a pending() (unidad del contrato aún no implementada en
  * una tarea posterior) y SKIP si llama a skip() (falta un requisito del entorno).
  * Exit code: 0 si no hubo FAIL, 1 si hubo alguno, 2 si no se encontró ningún test. Con la
- * variable SIN_SKIP=1 (CI) un SKIP cuenta como FAIL: en CI el entorno tiene que estar completo.
+ * variable SIN_SKIP=1 (tests/run-all.sh) un SKIP cuenta como FAIL: ahí el entorno tiene que estar completo.
  * Los unitarios nunca cargan app/config/config.local.php: lo que una unidad necesite de config
  * se le pasa armado en el test. Los de integración usan la DB a través de App\Core\Database,
  * que lee la config de la app; el test no la lee ni la imprime.

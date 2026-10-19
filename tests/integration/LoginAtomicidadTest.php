@@ -11,7 +11,7 @@ use App\Models\Admin;
 //   - DB: filas de login_intentos de la cuenta al final = 4 + (401 de la ráfaga) ≤ 5, porque los
 //     bloqueados borran su reserva (D-39) y los fallos verificados quedan.
 // Para que haya concurrencia real el servidor tiene que atender en paralelo:
-// PHP_CLI_SERVER_WORKERS=N php -S … (el CI usa 8). Con un php -S de un solo worker el test pasa
+// PHP_CLI_SERVER_WORKERS=N php -S … (tests/run-all.sh usa 8). Con un php -S de un solo worker el test pasa
 // pero no prueba la carrera (las requests se atienden en serie): correrlo así solo verifica el
 // conteo, no la atomicidad.
 // Limpia sus filas al terminar: no consume el presupuesto por IP del smoke.

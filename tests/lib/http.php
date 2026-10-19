@@ -105,7 +105,7 @@ final class Cliente
 /**
  * Dispara todos los handles a la vez (curl_multi) y devuelve sus resultados en el mismo orden.
  * La concurrencia real depende del servidor: `php -S` atiende de a una request salvo que se lo
- * levante con PHP_CLI_SERVER_WORKERS=N (así lo hace el CI).
+ * levante con PHP_CLI_SERVER_WORKERS=N (así lo hace tests/run-all.sh).
  *
  * @param list<CurlHandle> $handles
  * @return list<array{code: int, body: string, location: string}>

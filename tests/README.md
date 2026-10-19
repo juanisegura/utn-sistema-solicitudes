@@ -1,6 +1,6 @@
 # Tests (`tests/`)
 
-Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). El CI (`.github/workflows/ci.yml`) corre las tres. Ver la sección "Tests unitarios, integración y CI" al final.
+Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). La forma oficial de correr todo es **`bash tests/run-all.sh`** (sección "Corrida completa: run-all.sh" al final); no hay CI en GitHub (D-51).
 
 # Smoke HTTP (`tests/smoke.sh`)
 
@@ -128,6 +128,16 @@ Columna "Prueba mínima": P1 a P7 corresponden a la consigna (P1 solicitud váli
 | L.7 | email del admin en mayúsculas (`ADMIN@EXAMPLE.COM`) + password correcta → 302, /admin 200, logout 302 (la normalización a minúsculas sigue vigente con D-41) | extra · L (D-41) |
 | L.3 | admin demo: 5 fallos → 401; el 6.º con la password **correcta** → 429 + Retry-After + mensaje; /admin sigue en 302 a login | extra · L (D-38) |
 | L.6 | con el admin bloqueado (después de L.3): `ádmin@example.com` y `ÁDMIN@example.com` + password correcta → 401 o 429, nunca 302; /admin sigue en 302 a login (bypass por acentos, D-41) | extra · L (D-41) |
+| B.1 | búsqueda `q=pag-<marca>` → 200, "21 resultados para «…»", 20 filas en la página 1 (filas creadas por la corrida) | extra · B (M-3) |
+| B.2 | `q` con `%` y `_` literales: encuentra `escA-<marca>-a%b_c` y no `escB-<marca>-aZZbYc` (comodines escapados) | extra · B (M-3) |
+| B.3 | `q=<script>alert('b3')</script>` reflejado escapado en el estado de búsqueda y en el `value` del input; nunca crudo | extra · B (M-3) |
+| B.4 | `q` inválido → 400 sin fugas: 101 caracteres, UTF-8 inválido, control, salto de línea, array | extra · B (M-3) |
+| B.4b | `q` de exactamente 100 caracteres → 200 | extra · B (M-3) |
+| B.5 | `pagina` 0, abc, 01, -1, 1.5, espacio, 1e2 y array → 400 | extra · B (M-3) |
+| B.6 | `pagina=2` → 1 fila y "Página 2 de 2"; `pagina=3` y `999999999` → 404; sin resultados con `pagina=3` → 200 "No hay solicitudes que coincidan." | extra · B (M-3) |
+| B.7 | con `estado` y `q`: "Siguiente" → `?estado=…&amp;q=…&amp;pagina=2`; los filtros conservan `q` | extra · B (M-3) |
+| B.8 | detalle de la solicitud de P5: "Historial de estados" con 1 evento pendiente → en proceso; POST al mismo estado → 302 + flash y sigue 1 evento (no-op) | extra · B (M-2) |
+| B.9 | 404, 405, estático e id inválido sin `Set-Cookie`; `GET /` sí crea sesión | extra · B (M-5) |
 
 ## Contrato asumido
 
@@ -163,6 +173,7 @@ Cada corrida crea filas nuevas en la base. Ejecutar el smoke solo contra una bas
 php scripts/instalar-db.php   # borra y recrea las tablas, y carga el seed
 ```
 
+- La sección B crea 23 solicitudes más por el formulario público (21 `pag-<marca>` para tener dos páginas y 2 para el escape de comodines); no hace logins fallidos, así que no cambia el presupuesto por IP.
 - Por corrida se crean dos solicitudes válidas: la normal (asunto `Valida <marca>`, que P5 pasa a `en_proceso`) y la de payloads HTML/SQL (P7.1).
 - Los casos inválidos no crean filas: P2.1 a P2.3, H.3 a H.5, P7.5 y H.12. Tampoco los intentos de login ni de cambio de estado rechazados (P4.x, P6.x).
 - El seed trae sus propias solicitudes, entre ellas una con `<script>`. Por eso P7.2 busca la fila de esta corrida por su marca y no la primera que contenga el payload.
@@ -206,9 +217,9 @@ de ese archivo a `ahora - 1801` (y `ahora - 1700` como control): `GET /admin` �
 `/admin/login` con ID nuevo y el archivo viejo borrado; un `POST` de estado con el token previo
 → 401 sin cambio. Con el control (1700 s) → 200.
 
-## Tests unitarios, integración y CI (M-7, M-8, D-48)
+## Tests unitarios e integración (M-7, M-8, D-48)
 
-Runner propio sin dependencias (`tests/lib/runner.php`, sin Composer por ADR-0001). Descubre los `*Test.php` del directorio; cada caso es `test('nombre', fn () => …)` con aserciones mínimas (`assertSame`, `assertTrue`, `assertFalse`, `assertNull`, `assertNotSame`, `assertContains`, `assertThrows`). Salida por caso: `PASS`, `FAIL` (con el mensaje), `PEND` (la unidad del contrato todavía no existe: se implementa en una tarea posterior) o `SKIP` (falta DB o servidor). Exit code 0 sin FAIL, 1 con alguno, 2 si no hay tests. Con `SIN_SKIP=1` (así corre el CI) un SKIP cuenta como FAIL.
+Runner propio sin dependencias (`tests/lib/runner.php`, sin Composer por ADR-0001). Descubre los `*Test.php` del directorio; cada caso es `test('nombre', fn () => …)` con aserciones mínimas (`assertSame`, `assertTrue`, `assertFalse`, `assertNull`, `assertNotSame`, `assertContains`, `assertThrows`). Salida por caso: `PASS`, `FAIL` (con el mensaje), `PEND` (la unidad del contrato todavía no existe: se implementa en una tarea posterior) o `SKIP` (falta DB o servidor). Exit code 0 sin FAIL, 1 con alguno, 2 si no hay tests. Con `SIN_SKIP=1` (así los corre `run-all.sh`) un SKIP cuenta como FAIL.
 
 ```bash
 php tests/unit/run.php                 # todos los unitarios
@@ -221,17 +232,38 @@ BASE_URL=http://localhost:8080 php tests/integration/run.php
 
 | Archivo | Unidad | Qué verifica |
 |---|---|---|
-| `unit/ValidatorTest.php` | `Validator` | UTF-8 inválido, recorte Unicode (NBSP, ZWSP, BOM, U+3000), controles, CR/LF en una línea, multiline, `max` en caracteres, email, regla desconocida |
+| `unit/ValidatorTest.php` | `Validator` | UTF-8 inválido, recorte Unicode (NBSP, ZWSP, BOM, U+3000), controles, CR/LF en una línea, multiline, `max` en caracteres, email, regla desconocida; recorte lineal con `pcre.jit=0` (hallazgo A2-08, falla hasta el fix) |
 | `unit/EstadoTest.php` | `Estado` | `fromInput` (válidos, null/vacío, trim, fuera de lista), coincidencia con el ENUM de `schema.sql` |
 | `unit/RouterTest.php` | `Router` | `{id}` con `$D` y `[1-9][0-9]{0,9}`, escape del patrón, `Allow` + HEAD; dispatch 404/405/HEAD/`{id}` int; **M-5**: 404/405 sin sesión, acción con sesión activa |
 | `unit/CsrfTest.php` | `Csrf` | `verify` con null, vacío, otro token, prefijo/sufijo, guardado no-string, array (TypeError); `rotate`; formato de `token()` |
 | `unit/ResponseTest.php` | `Response::redirect` | 15 destinos rechazados (esquema, `//`, `/\`, CR/LF, NUL, TAB, DEL); local → 302 y termina |
 | `unit/AdminTest.php` | `Admin` | `normalizeEmail` (multibyte, idempotente, sin quitar acentos — D-41), `passwordAcceptable` (72 bytes, NUL), bcrypt costo 12 fijo y hash ficticio igual (D-35, D-37) |
 | `unit/RequestIpTest.php` | `Request::ip` (M-1) | sin proxies, proxy confiable, XFF falsificado, derecha a izquierda, cadena, CIDR v4/v6, huecos (a)–(d) de D-49 |
-| `unit/LogTest.php` | `Log` (M-6) | "supera" estricto, rotación antes de escribir, corrimiento y descarte, tope de archivos, 2 procesos concurrentes sin líneas perdidas/mezcladas |
+| `unit/LogTest.php` | `Log` (M-6) | "supera" estricto, rotación antes de escribir, corrimiento y descarte, tope de archivos, 2 procesos concurrentes sin líneas perdidas/mezcladas; una rotación que falla no hace lanzar a `write` (hallazgo A2-08, falla hasta el fix) |
 | `unit/SessionTimeoutTest.php` | `Session` (**M-8**) | antes/después de vencer (manipulando `_last_activity`), ID nuevo y sesión vieja borrada, ventana deslizante, tiempo real 1 s, `gc_maxlifetime ≥ timeout` |
 | `unit/LikeEscapeTest.php` | escape de LIKE (M-3) | `%`, `_`, `\` (la barra primero), multibyte; PENDIENTE si la función no existe |
 | `integration/LoginAtomicidadTest.php` | límite (M-1, D-46) | 4 fallos + ráfaga de 8 simultáneos → ≤ 1 verificado (401) y filas = previas + verificados ≤ 5; CSRF inválido no reserva; éxito no deja fila |
 | `integration/HistorialTransaccionTest.php` | historial (M-2) | alta sin evento, evento con anterior/nuevo/admin, no-op sin evento, 422/404 sin evento, cambios simultáneos encadenados, FK CASCADE/RESTRICT, vista; PENDIENTE sin la tabla |
 
-**CI** (`.github/workflows/ci.yml`, en push y pull request a `main`): matriz PHP 8.2 y 8.5 con MySQL 8.0 como servicio (healthcheck). Pasos: `php -l` de todo el árbol → unitarios (todavía sin config) → `config.local.php` generado con las credenciales del contenedor efímero (no son secretos; `env=local`, `debug=false`) → `instalar-db` → `php -S` con 8 workers y espera activa → integración → `instalar-db` otra vez (el smoke exige DB recién instalada) → `smoke.sh --evidencia`. Si algo falla, sube `doc/pruebas/evidencias/` y `storage/logs/` como artifact.
+## Corrida completa: `run-all.sh` (D-51)
+
+```bash
+bash tests/run-all.sh                 # servidor de prueba propio en 127.0.0.1:8090
+bash tests/run-all.sh --puerto 8095   # otro puerto (nunca 8080: es el de desarrollo)
+bash tests/run-all.sh --evidencia     # se lo pasa al smoke (doc/pruebas/evidencias/)
+```
+
+Etapas, en orden, cortando en el primer fallo: (1) `php -l` de `app/`, `public_html/`, `scripts/` y `tests/`; (2) unitarios; (3) `instalar-db`; (4) levanta un `php -S` propio con `PHP_CLI_SERVER_WORKERS=8` (concurrencia real para la ráfaga de M-1), espera a que responda y corre la integración con `SIN_SKIP=1`; (5) reinstala la DB y corre el smoke contra ese mismo servidor. Al salir (también si falla o con Ctrl+C) baja el servidor y su grupo de workers e imprime un resumen por etapa. Exit ≠ 0 si algo falló. No toca el servidor de desarrollo de `:8080` ni lee `config.local.php` (la DB la usa la app con su propia config). **Requiere turno exclusivo de DB** (D-42): borra y recrea las tablas; al terminar quedan el seed y las filas del smoke.
+
+**Qué no se verifica automáticamente (D-51)**: no hay CI, así que la versión mínima **PHP 8.2** (D-35) y **MySQL 8.0** (el desarrollo usa PHP 8.5 y MariaDB 11.8) no se prueban en cada cambio. Si hiciera falta, a mano con contenedores efímeros (Podman o Docker), por ejemplo:
+
+```bash
+podman run -d --name utn-mysql8 -e MYSQL_ROOT_PASSWORD=<efímera> -e MYSQL_DATABASE=utn_solicitudes \
+  -e MYSQL_USER=utn_prueba -e MYSQL_PASSWORD=<efímera> -p 3307:3306 mysql:8.0
+# config.local.php de una copia del repo apuntando a 127.0.0.1:3307 con esas credenciales efímeras;
+# PHP 8.2 con las extensiones pdo_mysql, mbstring y curl (por ejemplo la imagen php:8.2-cli):
+podman run --rm --network host -v "$PWD":/app -w /app php:8.2-cli bash tests/run-all.sh --puerto 8096
+podman rm -f utn-mysql8
+```
+
+(la imagen `php:8.2-cli` necesita `docker-php-ext-install pdo_mysql` y `curl` antes de correr; MySQL 8.0 usa `caching_sha2_password`, que mysqlnd soporta).

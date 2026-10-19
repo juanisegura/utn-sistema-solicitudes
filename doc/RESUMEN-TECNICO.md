@@ -25,7 +25,7 @@ request
 | Entrada | Front controller y reglas de Apache | [public_html/index.php](../public_html/index.php), [public_html/.htaccess](../public_html/.htaccess) |
 | Arranque | Errores, headers, config, sesión | [app/bootstrap.php](../app/bootstrap.php), [app/config/config.php](../app/config/config.php) |
 | Rutas | Tabla método + patrón + opciones | [app/routes.php](../app/routes.php) |
-| Núcleo | Router, Database, Session, Auth, Csrf, Request, Response, Validator, View | [app/Core/](../app/Core/) |
+| Núcleo | Router, Database, Session, Auth, Csrf, Request, Response, Validator, View, Config (configuración cargada una sola vez por `bootstrap`; las clases no leen `config.php` por su cuenta), Log | [app/Core/](../app/Core/) |
 | Controllers | Finos, sin SQL | [app/Controllers/](../app/Controllers/) |
 | Models | Acceso a datos y enum `Estado` | [app/Models/](../app/Models/) |
 | Views | Presentación, sin lógica ni SQL | [app/Views/](../app/Views/) |
@@ -71,7 +71,7 @@ Definida en [database/schema.sql](../database/schema.sql), con cuatro tablas:
 | Sesión | Cookie `utn_sesion` HttpOnly y SameSite=Lax (Secure con HTTPS o `env=production`), `use_strict_mode`, regeneración de ID y del token CSRF en login, timeout por inactividad (`app.session_timeout`), logout destruye la sesión y la cookie. La sesión se abre en el Router solo cuando hay ruta y método válidos: 404, 405 y estáticos no crean sesión ni mandan `Set-Cookie` (M-5) | [Session.php](../app/Core/Session.php), [Auth.php](../app/Core/Auth.php), [Router.php](../app/Core/Router.php) | S.4, S.5, S.8; timeout solo manual |
 | CSRF | Token de 32 bytes, `hash_equals`, validado en el Router en todo POST; fallo devuelve 419 | [Csrf.php](../app/Core/Csrf.php), [Router.php](../app/Core/Router.php) | H.1, H.3, H.4, H.5, P6.2, P6.3, S.7 |
 | Autorización / acceso al panel | `'auth' => true` en las rutas `/admin/*` salvo login; `Auth::user()` re-verifica en DB que el admin siga activo. Sin sesión: GET 302, POST 401 (D-17) | [routes.php](../app/routes.php), [Auth.php](../app/Core/Auth.php) | P3.1–P3.4, P6.1, P6.7, H.2 |
-| Validación server-side | `Validator`: obligatorios, email, largos máximos, UTF-8 válido, recorte de espacios Unicode y rechazo de caracteres de control (saltos de línea solo en la descripción); estado contra el enum `Estado`, `{id}` solo enteros positivos en el Router; parámetros como array rechazados por `Request::string()`; en el listado, `q` (≤ 100, mismas reglas del `Validator`) y `pagina` (solo dígitos, ≥ 1) inválidos → 400, página fuera de rango → 404 | [Validator.php](../app/Core/Validator.php), [Request.php](../app/Core/Request.php) | P2.1–P2.5, P6.4, P6.6, P6.8, H.12–H.14 |
+| Validación server-side | `Validator`: obligatorios, email, largos máximos, UTF-8 válido, recorte de espacios Unicode y rechazo de caracteres de control (TAB y saltos de línea solo en la descripción, D-50); estado contra el enum `Estado`, `{id}` solo enteros positivos en el Router; parámetros como array rechazados por `Request::string()`; en el listado, `q` (≤ 100, mismas reglas del `Validator`) y `pagina` (solo dígitos, ≥ 1) inválidos → 400, página fuera de rango → 404 | [Validator.php](../app/Core/Validator.php), [Request.php](../app/Core/Request.php) | P2.1–P2.5, P6.4, P6.6, P6.8, H.12–H.14 |
 | Manejo de errores | Warnings a excepciones; log en `storage/logs/app.log` con rotación por tamaño (1 MB, 5 archivos, `flock`; M-6); vista 500 genérica; `display_errors=0` fuera de debug | [bootstrap.php](../app/bootstrap.php), [Log.php](../app/Core/Log.php) | H.7, H.11, H.12, H.13, H.14 (sin fugas ni 500) |
 | Secretos / configuración | Defaults seguros versionados; `config.local.php` fuera de Git; `.htaccess` raíz con `Require all denied` | [config.php](../app/config/config.php), [.htaccess](../.htaccess) | H.15 (dotfiles con `php -S`); el bloqueo de la raíz se verificó con Apache (`.git/config` 200 → 403, D-33), sin caso de smoke |
 | Clickjacking / MIME | `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `frame-ancestors 'none'`, `Referrer-Policy` | [bootstrap.php](../app/bootstrap.php), [public_html/.htaccess](../public_html/.htaccess) | S.1, S.2, S.3 |
@@ -91,6 +91,7 @@ Definida en [database/schema.sql](../database/schema.sql), con cuatro tablas:
 
 ## Mejoras pendientes
 
+- Router: extraer la resolución de rutas a un `RouteMatcher` público y que `dispatch` devuelva un resultado en vez de terminar con `exit`, para testearlo sin procesos hijo (sugerencia de AGENTE 2 en A2-07).
 - Búsqueda: hoy es `LIKE '%texto%'` sobre cuatro columnas, que recorre la tabla completa (EXPLAIN: `type=ALL`). Alcanza para el volumen del TP; con miles de solicitudes convendría un índice `FULLTEXT` (`MATCH … AGAINST`).
 - Logs: la rotación propia alcanza para un hosting compartido; en un servidor propio conviene `logrotate` (rotación por tiempo, compresión y retención centralizadas) y desactivar la del código con un `app.log_max_bytes` alto.
 - Tests unitarios y CI; hoy solo hay smoke por HTTP.

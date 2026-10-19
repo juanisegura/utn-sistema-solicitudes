@@ -299,6 +299,8 @@ implementación, revisión adversarial, corrida oficial del orquestador.
   (`http_build_query`, escapado con `e()`); el filtro activo sigue con `aria-current`;
   la paginación es `<nav aria-label="Paginación">` con anterior/siguiente y "Página N de M".
 - Orden sin cambios: `created_at DESC, id DESC` (D-20).
+- `pagina` acepta hasta 9 dígitos (`^[1-9][0-9]{0,8}$`): más largo, `01` o vacío → 400
+  (evita desbordes en el OFFSET; D-53).
 
 ### M-4 Contadores con `GROUP BY`
 
