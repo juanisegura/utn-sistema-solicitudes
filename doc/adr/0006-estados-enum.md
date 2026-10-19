@@ -39,3 +39,8 @@ podría terminar en el SQL o persistir un estado inexistente.
 - Deuda: los valores están duplicados (`schema.sql` y `Estado.php`), y agregar un estado
   exige un `ALTER TABLE` más el cambio del enum. Se acepta para 3 valores fijos; si
   cambian a menudo, migrar a tabla + FK.
+
+## Revisión posterior (fase de mejoras, M-2)
+
+El ENUM de estados se repite en `solicitud_eventos.estado_anterior/estado_nuevo`
+(ADR-0010): agregar un estado exige actualizar las tres columnas además del enum PHP.

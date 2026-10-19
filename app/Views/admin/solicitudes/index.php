@@ -1,14 +1,28 @@
 <?php
 /**
- * @var list<array<string, mixed>>  $solicitudes ya filtradas, más recientes primero
+ * @var list<array<string, mixed>>  $solicitudes página actual, más recientes primero
  * @var \App\Models\Estado|null     $estadoActivo
- * @var array<string, int>          $conteo cantidad por valor de estado (sobre el total)
- * @var int                         $total
+ * @var string                      $q           búsqueda vigente ('' = ninguna)
+ * @var array<string, int>          $conteo      cantidad por estado (respeta la búsqueda, no el filtro)
+ * @var int                         $total       suma de $conteo
+ * @var int                         $resultados  filas que cumplen filtro + búsqueda
+ * @var list<array{label: string, url: string, activo: bool}> $filtros
+ * @var array{pagina: int, paginas: int, anterior: ?string, siguiente: ?string} $paginacion
+ * @var string                      $limpiarUrl  listado sin búsqueda (conserva el filtro)
  */
 use App\Models\Estado;
 ?>
 <div class="page-head">
     <h1 class="page-title">Solicitudes</h1>
+    <form method="get" action="/admin" class="search" role="search">
+        <?php if ($estadoActivo !== null): ?>
+            <input type="hidden" name="estado" value="<?= e($estadoActivo->value) ?>">
+        <?php endif; ?>
+        <label for="buscar" class="visually-hidden">Buscar por asunto, nombre, email o descripción</label>
+        <input id="buscar" name="q" type="search" value="<?= e($q) ?>" maxlength="100"
+            placeholder="Buscar por asunto, nombre, email o descripción">
+        <button type="submit" class="btn">Buscar</button>
+    </form>
 </div>
 
 <dl class="stats">
@@ -24,20 +38,31 @@ use App\Models\Estado;
     <?php endforeach; ?>
 </dl>
 
-<nav class="segmented" aria-label="Filtrar por estado">
-    <a href="/admin"<?= $estadoActivo === null ? ' aria-current="page"' : '' ?>>Todas</a>
-    <?php foreach (Estado::cases() as $estado): ?>
-        <a href="/admin?estado=<?= e($estado->value) ?>"<?= $estadoActivo === $estado ? ' aria-current="page"' : '' ?>><?= e($estado->label()) ?></a>
-    <?php endforeach; ?>
-</nav>
+<div class="list-tools">
+    <nav class="segmented" aria-label="Filtrar por estado">
+        <?php foreach ($filtros as $filtro): ?>
+            <a href="<?= e($filtro['url']) ?>"<?= $filtro['activo'] ? ' aria-current="page"' : '' ?>><?= e($filtro['label']) ?></a>
+        <?php endforeach; ?>
+    </nav>
+    <?php if ($q !== ''): ?>
+        <p class="search-status" role="status">
+            <?= e($resultados) ?> <?= $resultados === 1 ? 'resultado' : 'resultados' ?> para «<?= e($q) ?>».
+            <a href="<?= e($limpiarUrl) ?>">Quitar búsqueda</a>
+        </p>
+    <?php endif; ?>
+</div>
 
 <?php if ($solicitudes === []): ?>
-    <p class="empty">No hay solicitudes<?= $estadoActivo !== null ? ' en estado «' . e($estadoActivo->label()) . '»' : '' ?>.</p>
+    <?php if ($q !== ''): ?>
+        <p class="empty">No hay solicitudes que coincidan.</p>
+    <?php else: ?>
+        <p class="empty">No hay solicitudes<?= $estadoActivo !== null ? ' en estado «' . e($estadoActivo->label()) . '»' : '' ?>.</p>
+    <?php endif; ?>
 <?php else: ?>
     <div class="table-wrap">
         <table class="table">
             <caption class="visually-hidden">
-                Solicitudes<?= $estadoActivo !== null ? ' en estado ' . e($estadoActivo->label()) : '' ?>, más recientes primero
+                Solicitudes<?= $estadoActivo !== null ? ' en estado ' . e($estadoActivo->label()) : '' ?><?= $q !== '' ? ' que coinciden con «' . e($q) . '»' : '' ?>, más recientes primero, página <?= e($paginacion['pagina']) ?> de <?= e($paginacion['paginas']) ?>
             </caption>
             <colgroup>
                 <col class="col-id"><col class="col-asunto"><col class="col-persona"><col class="col-estado"><col class="col-fecha">
@@ -64,4 +89,20 @@ use App\Models\Estado;
             </tbody>
         </table>
     </div>
+
+    <?php if ($paginacion['paginas'] > 1): ?>
+        <nav class="pagination" aria-label="Paginación">
+            <?php if ($paginacion['anterior'] !== null): ?>
+                <a class="btn" href="<?= e($paginacion['anterior']) ?>" rel="prev">Anterior</a>
+            <?php else: ?>
+                <span class="btn is-disabled" aria-disabled="true">Anterior</span>
+            <?php endif; ?>
+            <span class="pagination-status">Página <?= e($paginacion['pagina']) ?> de <?= e($paginacion['paginas']) ?></span>
+            <?php if ($paginacion['siguiente'] !== null): ?>
+                <a class="btn" href="<?= e($paginacion['siguiente']) ?>" rel="next">Siguiente</a>
+            <?php else: ?>
+                <span class="btn is-disabled" aria-disabled="true">Siguiente</span>
+            <?php endif; ?>
+        </nav>
+    <?php endif; ?>
 <?php endif; ?>

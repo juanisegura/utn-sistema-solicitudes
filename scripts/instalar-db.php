@@ -17,7 +17,7 @@ require dirname(__DIR__) . '/app/autoload.php';
 
 use App\Core\Database;
 
-const TABLAS = ['admins', 'solicitudes', 'login_intentos'];
+const TABLAS = ['admins', 'solicitudes', 'solicitud_eventos', 'login_intentos'];
 
 /**
  * Parte un archivo .sql en sentencias. Alcanza para nuestros archivos: comentarios de
@@ -89,7 +89,7 @@ try {
     foreach (TABLAS as $tabla) {
         // $tabla viene de la constante TABLAS, no de la entrada: los identificadores no se pueden parametrizar.
         $fila = Database::fetchOne("SELECT COUNT(*) AS total FROM {$tabla}");
-        printf("  %-15s %d\n", $tabla, $fila['total']);
+        printf("  %-18s %d\n", $tabla, $fila['total']);
     }
 
     if ($conDatos) {

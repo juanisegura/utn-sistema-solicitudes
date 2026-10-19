@@ -19,3 +19,20 @@ INSERT INTO solicitudes (nombre, email, asunto, descripcion, estado, created_at,
 ('Federico Ejemplo', 'federico.ejemplo@example.com', 'Proyector del aula 204 no enciende', 'El proyector del aula 204 no enciende desde el lunes y el control remoto no responde. La clase de la tarde necesita el equipo para la presentación del proyecto.', 'resuelta', NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 DAY),
 ('Gabriela Ficticia', 'gabriela.ficticia@example.com', 'Error al subir archivos al campus virtual', 'Al subir un PDF de 12 MB al campus virtual, la carga se corta al 90 por ciento y muestra un error genérico. Con archivos más chicos la carga funciona sin problemas.', 'en_proceso', NOW() - INTERVAL 30 HOUR, NOW() - INTERVAL 5 HOUR),
 ('Irene Demo', 'irene.demo@example.com', '<script>alert(1)</script> Prueba de escape', 'Fila de prueba intencional de XSS: el panel debe mostrar el asunto como texto literal y nunca ejecutar el script. También incluye la muestra de inyección SQL '' OR 1=1 -- que debe verse escapada y no ejecutarse.', 'pendiente', NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 2 HOUR);
+
+-- Historial coherente con el estado y las fechas de cada solicitud que no está pendiente
+-- (ids 1..8 en el orden del INSERT de arriba: la tabla se recrea, el AUTO_INCREMENT arranca en 1).
+-- Las resueltas pasan antes por "en proceso". Autor: el admin demo.
+INSERT INTO solicitud_eventos (solicitud_id, admin_id, estado_anterior, estado_nuevo, created_at)
+SELECT e.solicitud_id, a.id, e.anterior, e.nuevo, e.fecha
+FROM admins a
+JOIN (
+    SELECT 2 AS solicitud_id, 'pendiente' AS anterior, 'en_proceso' AS nuevo, NOW() - INTERVAL 2 DAY AS fecha
+    UNION ALL SELECT 3, 'pendiente',  'en_proceso', NOW() - INTERVAL 1 DAY
+    UNION ALL SELECT 4, 'pendiente',  'en_proceso', NOW() - INTERVAL 132 HOUR
+    UNION ALL SELECT 4, 'en_proceso', 'resuelta',   NOW() - INTERVAL 5 DAY
+    UNION ALL SELECT 6, 'pendiente',  'en_proceso', NOW() - INTERVAL 60 HOUR
+    UNION ALL SELECT 6, 'en_proceso', 'resuelta',   NOW() - INTERVAL 2 DAY
+    UNION ALL SELECT 7, 'pendiente',  'en_proceso', NOW() - INTERVAL 5 HOUR
+) e
+WHERE a.email = 'admin@example.com';

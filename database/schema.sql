@@ -4,6 +4,8 @@
 
 SET NAMES utf8mb4;
 
+-- solicitud_eventos primero: referencia a solicitudes y admins.
+DROP TABLE IF EXISTS solicitud_eventos;
 DROP TABLE IF EXISTS login_intentos;
 DROP TABLE IF EXISTS solicitudes;
 DROP TABLE IF EXISTS admins;
@@ -47,4 +49,21 @@ CREATE TABLE login_intentos (
     PRIMARY KEY (id),
     KEY idx_cuenta (ip, email_hash, created_at), -- límite por IP + email
     KEY idx_ip (ip, created_at)                  -- límite por IP sola
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Historial de cambios de estado (ADR-0010). Un evento por cambio real (mismo estado → sin evento).
+-- CASCADE: si se borra la solicitud, su historial no tiene sentido sin ella.
+-- RESTRICT: no se puede borrar un admin con cambios registrados (se desactiva con `activo`).
+CREATE TABLE solicitud_eventos (
+    id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    solicitud_id     INT UNSIGNED NOT NULL,
+    admin_id         INT UNSIGNED NOT NULL,
+    estado_anterior  ENUM('pendiente','en_proceso','resuelta') NOT NULL,
+    estado_nuevo     ENUM('pendiente','en_proceso','resuelta') NOT NULL,
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_solicitud_fecha (solicitud_id, created_at),
+    KEY idx_admin (admin_id),
+    CONSTRAINT fk_eventos_solicitud FOREIGN KEY (solicitud_id) REFERENCES solicitudes (id) ON DELETE CASCADE,
+    CONSTRAINT fk_eventos_admin FOREIGN KEY (admin_id) REFERENCES admins (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

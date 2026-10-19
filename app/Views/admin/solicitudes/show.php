@@ -4,6 +4,7 @@
  * @var list<\App\Models\Estado>   $estados
  * @var string|null                $flash confirmación del último cambio (PRG)
  * @var string|null                $error estado inválido (422)
+ * @var list<array{fecha: string, admin: string, anterior: \App\Models\Estado, nuevo: \App\Models\Estado}> $eventos más reciente primero
  */
 use App\Core\Csrf;
 ?>
@@ -21,6 +22,28 @@ use App\Core\Csrf;
         <p class="detail-ref">Solicitud #<?= e($solicitud['id']) ?></p>
         <h1 class="detail-title"><?= e($solicitud['asunto']) ?></h1>
         <div class="prose prewrap"><?= e($solicitud['descripcion']) ?></div>
+
+        <section class="history" aria-labelledby="titulo-historial">
+            <h2 id="titulo-historial" class="section-title">Historial de estados</h2>
+            <?php if ($eventos === []): ?>
+                <p class="hint">Sin cambios de estado todavía.</p>
+            <?php else: ?>
+                <ol class="timeline">
+                    <?php foreach ($eventos as $evento): ?>
+                        <li class="timeline-item timeline-<?= e($evento['nuevo']->value) ?>">
+                            <span class="timeline-change">
+                                <span class="badge badge-<?= e($evento['anterior']->value) ?>"><?= e($evento['anterior']->label()) ?></span>
+                                <span class="timeline-arrow" aria-hidden="true">→</span>
+                                <span class="visually-hidden">a</span>
+                                <span class="badge badge-<?= e($evento['nuevo']->value) ?>"><?= e($evento['nuevo']->label()) ?></span>
+                            </span>
+                            <span class="timeline-meta"><span class="num"><?= e($evento['fecha']) ?></span>, <?= e($evento['admin']) ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ol>
+            <?php endif; ?>
+            <p class="timeline-origin hint">Recibida el <span class="num"><?= e($solicitud['creada']) ?></span> como «Pendiente».</p>
+        </section>
     </article>
 
     <aside class="detail-side" aria-label="Datos y estado de la solicitud">

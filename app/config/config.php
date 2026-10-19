@@ -21,6 +21,8 @@ $defaults = [
         // Rotación de storage/logs/app.log (M-6): tamaño máximo y cantidad de archivos viejos.
         'log_max_bytes'    => 1048576,
         'log_max_archivos' => 5,
+        // Solicitudes por página en el listado del panel (M-3).
+        'por_pagina' => 20,
     ],
     'db' => [
         'host'    => '127.0.0.1',
