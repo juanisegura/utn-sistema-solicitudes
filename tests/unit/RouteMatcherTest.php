@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-// R-2 (D-57): App\Core\RouteMatcher puro — sin $_SERVER, sin salida, sin exit. Reemplaza los
-// casos de Reflection de RouterTest. Contrato: match($method, $path) → RouteMatch inmutable con
+// R-2 (D-57): App\Core\RouteMatcher puro — sin $_SERVER, sin salida, sin exit. Contrato: match($method, $path) → RouteMatch inmutable con
 // status 200 | 404 | 405 y, según el caso, handler, params (ints), options o allow (con HEAD si
-// hay GET). PENDIENTE mientras la clase no exista.
+// hay GET).
 
 final class CtlRm
 {

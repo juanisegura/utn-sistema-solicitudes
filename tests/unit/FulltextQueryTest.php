@@ -7,12 +7,17 @@ declare(strict_types=1);
 // defecto de InnoDB; cada una va como "+palabra*" (prefijo, todas obligatorias); los operadores
 // booleanos que escriba el usuario (+ - < > ( ) ~ * " @) no pasan; si no queda ninguna → null
 // (fallback a LIKE). Se compara el conjunto de términos (sin orden ni mayúsculas: el contrato no
-// los fija). PENDIENTE mientras Solicitud::fulltextQuery no exista.
+// los fija).
 
 /** @param list<string> $palabras */
 function esperado(array $palabras): array
 {
     return terminosFt(implode(' ', array_map(fn ($p) => '+' . $p . '*', $palabras)));
+}
+
+function fulltextQuery(string $q): ?string
+{
+    return App\Models\Solicitud::fulltextQuery($q);
 }
 
 function ft(string $q): array

@@ -9,9 +9,6 @@ declare(strict_types=1);
 /** Corre Kernel::handle con una ruta GET /x cuyo controller hace $DATOS['accion']. */
 function kernelCon(string $accion): array
 {
-    if (!class_exists('App\\Core\\Kernel')) {
-        pending('App\Core\Kernel no existe todavía (R-2)');
-    }
     $r = enHijo(<<<'PHP'
         final class CtlKernel
         {

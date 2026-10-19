@@ -13,7 +13,8 @@ declare(strict_types=1);
  * excepción); queda PENDIENTE si llama a pending() (unidad del contrato aún no implementada en
  * una tarea posterior) y SKIP si llama a skip() (falta un requisito del entorno).
  * Exit code: 0 si no hubo FAIL, 1 si hubo alguno, 2 si no se encontró ningún test. Con la
- * variable SIN_SKIP=1 (tests/run-all.sh) un SKIP cuenta como FAIL: ahí el entorno tiene que estar completo.
+ * variable SIN_SKIP=1 (tests/run-all.sh) un SKIP o un PENDIENTE cuentan como FAIL: ahí el entorno
+ * tiene que estar completo y no puede quedar nada sin implementar (AU-6, Q-08).
  * Los unitarios nunca cargan app/config/config.local.php: lo que una unidad necesite de config
  * se le pasa armado en el test. Los de integración usan la DB a través de App\Core\Database,
  * que lee la config de la app; el test no la lee ni la imprime.
@@ -27,6 +28,7 @@ require_once APP_DIR . '/autoload.php';
 require_once APP_DIR . '/helpers.php';
 require __DIR__ . '/child.php';
 require __DIR__ . '/contrato.php';
+require __DIR__ . '/arbol.php';
 
 final class AssertionFailed extends Exception
 {
@@ -259,9 +261,10 @@ function correrSuite(string $dir, string $titulo, array $argv): int
     );
 
     $sinSkip = getenv('SIN_SKIP') === '1';
-    if ($sinSkip && $cuenta['SKIP'] > 0) {
-        echo "SIN_SKIP=1: los SKIP cuentan como FAIL\n";
+    $noCorridos = $cuenta['SKIP'] + $cuenta['PEND'];
+    if ($sinSkip && $noCorridos > 0) {
+        echo "SIN_SKIP=1: los SKIP y PENDIENTE cuentan como FAIL\n";
     }
 
-    return $cuenta['FAIL'] > 0 || ($sinSkip && $cuenta['SKIP'] > 0) ? 1 : 0;
+    return $cuenta['FAIL'] > 0 || ($sinSkip && $noCorridos > 0) ? 1 : 0;
 }

@@ -17,9 +17,6 @@ function tamLog(): int
 
 test('404, 405, 419, 401, 400 y redirects no escriben en app.log ni muestran la vista 500', function () {
     requiereServidor();
-    if (!hayHttpException()) {
-        pending('R-2 no entregado (HttpException)');
-    }
     $antes = tamLog();
     $c = new Cliente();
     $esperado = [
@@ -48,9 +45,6 @@ test('405 conserva el header Allow tras el cambio a excepciones', function () {
 });
 
 test('bootstrap-cli: Database lista, sin sesión ni salida (proceso hijo limpio)', function () {
-    if (!is_file(APP_DIR . '/bootstrap-cli.php')) {
-        pending('R-3 no entregado: falta app/bootstrap-cli.php');
-    }
     requiereDb(); // SKIP si no hay DB de prueba
     $cli = realpath(APP_DIR . '/bootstrap-cli.php');
     $r = enHijo(<<<PHP

@@ -5,7 +5,7 @@ declare(strict_types=1);
 // R-1 (D-56): búsqueda híbrida FULLTEXT + LIKE, contra la DB y la app. Cada caso crea sus filas
 // (INSERT directo, con una marca aleatoria) y las borra al final; busca por HTTP como admin y lee
 // "N resultados para «q»" del listado. Los términos de prueba son palabras inventadas con la
-// marca, así no dependen del seed. PENDIENTE mientras falte el índice ft_busqueda.
+// marca, así no dependen del seed.
 
 function requiereFulltext(): void
 {
@@ -16,7 +16,7 @@ function requiereFulltext(): void
          WHERE table_schema = DATABASE() AND table_name = 'solicitudes' AND index_name = 'ft_busqueda'"
     );
     if ($n === 0) {
-        pending('falta el índice FULLTEXT ft_busqueda (R-1, A1-13)');
+        fail('falta el índice FULLTEXT ft_busqueda (R-1)');
     }
 }
 
@@ -84,7 +84,7 @@ test('el índice ft_busqueda es FULLTEXT sobre asunto, nombre, email y descripci
 
 test('EXPLAIN de una búsqueda con palabras usa ft_busqueda', function () {
     requiereFulltext();
-    $expr = fulltextQuery('campus virtual');
+    $expr = \App\Models\Solicitud::fulltextQuery('campus virtual');
     assertTrue($expr !== null, 'hay palabras indexables');
     $st = requiereDb()->prepare(
         'EXPLAIN SELECT id FROM solicitudes WHERE MATCH(asunto, nombre, email, descripcion) AGAINST(? IN BOOLEAN MODE)'
@@ -189,20 +189,34 @@ test('email completo como búsqueda (puntos, arroba y "com" como stopword)', fun
     }
 });
 
-test('contadores con q coherentes con el listado (M-4 con el mismo filtro)', function () {
+/** Contadores del listado: ['total' => n, 'pendiente' => n, 'en_proceso' => n, 'resuelta' => n]. */
+function contadores(string $html): array
+{
+    preg_match_all('#<div class="stat stat-([a-z_]+)">\s*<dt>[^<]*</dt>\s*<dd>(\d+)</dd>#u', $html, $m, PREG_SET_ORDER);
+    $out = [];
+    foreach ($m as [, $estado, $n]) {
+        $out[$estado] = (int) $n;
+    }
+
+    return $out;
+}
+
+test('contadores con q (M-4): Total y los tres estados, con uno en cero, coherentes con el listado', function () {
     requiereFulltext();
     $m = marcaFt();
     $ids = filasFt(["{$m}contador uno", "{$m}contador dos", "{$m}contador tres"]);
+    // Estados conocidos: 2 pendientes, 0 en proceso, 1 resuelta.
     requiereDb()->prepare("UPDATE solicitudes SET estado = 'resuelta' WHERE id = ?")->execute([$ids[0]]);
     try {
         $c = adminFt();
         [$n, $html] = buscarPanel($c, "{$m}contador");
         assertSame(3, $n);
-        if (preg_match('#<dt>Total</dt>\s*<dd>(\d+)</dd>#u', $html, $t) !== 1) {
-            fail('no encontré el contador Total');
-        }
-        assertSame(3, (int) $t[1], 'Total = resultados');
-        assertSame(1, buscarPanel($c, "{$m}contador", '&estado=resuelta')[0], 'con filtro de estado');
+        assertSame(['total' => 3, 'pendiente' => 2, 'en_proceso' => 0, 'resuelta' => 1], contadores($html));
+        // Con filtro de estado: el listado se filtra, los contadores no (respetan q, no estado).
+        [$nResuelta, $htmlResuelta] = buscarPanel($c, "{$m}contador", '&estado=resuelta');
+        assertSame(1, $nResuelta);
+        assertSame(['total' => 3, 'pendiente' => 2, 'en_proceso' => 0, 'resuelta' => 1], contadores($htmlResuelta));
+        assertSame(0, buscarPanel($c, "{$m}contador", '&estado=en_proceso')[0], 'el estado en cero no lista filas');
     } finally {
         borrarFilas($ids);
     }

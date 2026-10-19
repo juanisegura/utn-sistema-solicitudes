@@ -3,82 +3,36 @@
 declare(strict_types=1);
 
 /*
- * Adaptador al contrato de la segunda fase de mejoras (PLAN §6, D-55..D-58). Concentra acá los
- * nombres que el PLAN no fija del todo, para que un cambio de firma de A1-13 se corrija en un
- * solo lugar. Firmas propuestas (orquestador, A2-10):
- *   - App\Core\RouteMatcher (new RouteMatcher($routes))->match($method, $path): RouteMatch con
- *     propiedades públicas readonly status, handler, params, options, allow.
- *   - App\Core\HttpException con status y headers (A1-13: propiedades públicas readonly; la
- *     propuesta era getStatus()/getHeaders(), se aceptan ambas); el redirect es la misma
- *     HttpException con header Location (isRedirect()).
- *   - App\Models\Solicitud::fulltextQuery(string $q): ?string
- *   - app/bootstrap-cli.php
- * Mientras una pieza no exista, los tests que la usan quedan PENDIENTE (no FAIL).
+ * Helpers de los tests de la segunda fase de mejoras (PLAN §6): RouteMatcher (R-2), excepciones
+ * de control (R-2, D-57/D-59) y términos de FULLTEXT (R-1).
  */
 
-const CLASE_ROUTE_MATCHER = 'App\\Core\\RouteMatcher';
-const CLASE_HTTP_EXCEPTION = 'App\\Core\\HttpException';
-const CLASE_REDIRECT_EXCEPTION = 'App\\Core\\RedirectException';
-
-function hayRouteMatcher(): bool
-{
-    return class_exists(CLASE_ROUTE_MATCHER);
-}
-
-function hayHttpException(): bool
-{
-    return class_exists(CLASE_HTTP_EXCEPTION);
-}
+use App\Core\HttpException;
+use App\Core\RouteMatch;
+use App\Core\RouteMatcher;
 
 /** @param list<array> $rutas */
-function rmMatch(array $rutas, string $metodo, string $path): object
+function rmMatch(array $rutas, string $metodo, string $path): RouteMatch
 {
-    if (!hayRouteMatcher()) {
-        pending('App\Core\RouteMatcher no existe todavía (R-2, A1-13)');
-    }
-    $clase = CLASE_ROUTE_MATCHER;
-
-    return (new $clase($rutas))->match($metodo, $path);
+    return (new RouteMatcher($rutas))->match($metodo, $path);
 }
 
 /**
- * Corre $fn esperando una excepción de control (R-2) y devuelve status, headers y Location.
- * Falla si no lanza nada o si lanza otra cosa.
+ * Corre $fn esperando una excepción de control y devuelve su status, headers y Location. Falla si
+ * no lanza nada o si lanza otra cosa. El redirect es la misma HttpException con Location (D-59).
  *
- * @return array{status: int, headers: array<string, string>, location: ?string, clase: string}
+ * @return array{status: int, headers: array<string, string>, location: ?string}
  */
 function controlDe(callable $fn): array
 {
-    if (!hayHttpException()) {
-        pending('App\Core\HttpException no existe todavía (R-2, A1-13)');
-    }
     try {
         $fn();
+    } catch (HttpException $e) {
+        return ['status' => $e->status, 'headers' => $e->headers, 'location' => $e->headers['Location'] ?? null];
     } catch (Throwable $e) {
-        $esControl = is_a($e, CLASE_HTTP_EXCEPTION) || (class_exists(CLASE_REDIRECT_EXCEPTION) && is_a($e, CLASE_REDIRECT_EXCEPTION));
-        if (!$esControl) {
-            fail('se esperaba una excepción de control y se lanzó ' . $e::class . ': ' . $e->getMessage());
-        }
-        // Firma real de A1-13: propiedades públicas readonly $status y $headers; se aceptan también
-        // los getters propuestos en A2-10 (getStatus/getHeaders) por si cambian.
-        $status = method_exists($e, 'getStatus') ? (int) $e->getStatus() : (property_exists($e, 'status') ? (int) $e->status : (int) $e->getCode());
-        $headers = method_exists($e, 'getHeaders') ? (array) $e->getHeaders() : (property_exists($e, 'headers') ? (array) $e->headers : []);
-        $location = method_exists($e, 'getLocation') ? $e->getLocation() : ($headers['Location'] ?? null);
-
-        return ['status' => $status, 'headers' => $headers, 'location' => $location, 'clase' => $e::class];
+        fail('se esperaba HttpException y se lanzó ' . $e::class . ': ' . $e->getMessage());
     }
     fail('no se lanzó la excepción de control');
-}
-
-/** Solicitud::fulltextQuery (R-1, D-56) o PENDIENTE si todavía no existe. */
-function fulltextQuery(string $q): ?string
-{
-    foreach (['fulltextQuery', 'fulltextBooleano', 'terminosFulltext'] as $m) {
-        if (method_exists(App\Models\Solicitud::class, $m)) {
-            return llamarPrivado(App\Models\Solicitud::class, $m, $q);
-        }
-    }
-    pending('Solicitud::fulltextQuery no existe todavía (R-1, A1-13)');
 }
 
 /**

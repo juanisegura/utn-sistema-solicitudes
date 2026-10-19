@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Core\Response;
 
-// Response::redirect: solo paths locales (A2-03 hallazgo 4). Los rechazos lanzan antes de
-// header()/exit, así que se prueban en proceso; el caso aceptado termina con exit → hijo.
+// Response::redirect: solo paths locales (A2-03 hallazgo 4). El caso aceptado (HttpException con
+// Location) está en DespachoTest.php.
 
 test('redirect rechaza destinos que no son paths locales', function () {
     $malos = [
@@ -17,21 +17,3 @@ test('redirect rechaza destinos que no son paths locales', function () {
         assertThrows(InvalidArgumentException::class, fn () => Response::redirect($destino), exportar($destino));
     }
 });
-
-// Con R-2 redirect lanza HttpException en vez de exit: estos casos en hijo los reemplaza
-// DespachoTest.php (en proceso).
-if (!hayHttpException()) {
-    test('redirect a un path local → 302 y termina (proceso hijo)', function () {
-        $r = enHijo(<<<'PHP'
-            App\Core\Response::redirect('/admin/solicitudes/1?x=1');
-            $GLOBALS['resultado'] = 'no terminó';
-            PHP);
-        assertSame(302, $r['http']);
-        assertNull($r['resultado'], 'el código después de redirect no se ejecuta');
-    });
-
-    test('redirect con código explícito (303)', function () {
-        $r = enHijo('App\Core\Response::redirect("/gracias", 303);');
-        assertSame(303, $r['http']);
-    });
-}

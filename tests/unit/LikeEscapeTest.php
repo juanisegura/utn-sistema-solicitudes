@@ -5,17 +5,11 @@ declare(strict_types=1);
 use App\Models\Solicitud;
 
 // Escape de LIKE para la búsqueda del listado (M-3, A1-10): %, _ y \ del texto escapados para
-// usarse con ESCAPE '\\'. El contrato no fija el nombre de la función: se busca entre los
-// candidatos; si ninguno existe todavía, el caso queda PENDIENTE (no falla) hasta A1-10.
+// usarse con ESCAPE (bindeado, D-53).
 
 function escapeLike(string $texto): string
 {
-    foreach ([[Solicitud::class, 'escapeLike'], [Solicitud::class, 'likeEscape'], [App\Core\Database::class, 'escapeLike']] as [$c, $m]) {
-        if (method_exists($c, $m)) {
-            return (string) llamarPrivado($c, $m, $texto);
-        }
-    }
-    pending('función de escape de LIKE de M-3 no implementada todavía (A1-10)');
+    return Solicitud::escapeLike($texto);
 }
 
 test('texto sin comodines queda igual', function () {

@@ -5,10 +5,9 @@ declare(strict_types=1);
 use App\Core\Response;
 use App\Core\Router;
 
-// R-2 (D-57): despacho sin exit. Response::abort()/redirect() lanzan una excepción de control
-// (App\Core\HttpException con status y headers; el redirect puede ser RedirectException o la
-// misma con Location) que un único punto captura y emite. Ningún exit/die en app/. Todo en
-// proceso: sin Reflection ni proceso hijo. PENDIENTE mientras HttpException no exista.
+// R-2 (D-57, D-59): despacho sin exit. Response::abort()/redirect() lanzan App\Core\HttpException
+// (status y headers; el redirect es la misma con Location) que Kernel::handle captura y emite.
+// Ningún exit/die en app/. Todo en proceso: sin Reflection ni proceso hijo.
 
 test('abort(419) lanza control con status 419 y no emite nada', function () {
     ob_start();
@@ -43,9 +42,6 @@ test('redirect con código explícito y query string', function () {
 });
 
 test('redirect sigue rechazando destinos externos, "\\" y controles (InvalidArgumentException, no control)', function () {
-    if (!hayHttpException()) {
-        pending('App\Core\HttpException no existe todavía (R-2, A1-13)');
-    }
     foreach (['http://evil.example', '//evil.example', '/\\evil.example', "/ok\r\nX: y", "/ok\0", 'evil', ''] as $d) {
         assertThrows(InvalidArgumentException::class, fn () => Response::redirect($d), exportar($d));
     }
@@ -76,9 +72,6 @@ test('dispatch: 405 lanza control con Allow y no abre sesión (M-5)', function (
 });
 
 test('ningún exit/die en app/ (solo el front controller y los scripts CLI)', function () {
-    if (!hayHttpException()) {
-        pending('R-2 no entregado: hoy abort/redirect todavía terminan con exit');
-    }
     $con = [];
     $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(APP_DIR, FilesystemIterator::SKIP_DOTS));
     foreach ($it as $f) {
@@ -94,14 +87,9 @@ test('ningún exit/die en app/ (solo el front controller y los scripts CLI)', fu
     assertSame([], $con, 'exit/die encontrados');
 });
 
-// A2-11 (hallazgo, informativo): HttpException no valida el status. Hoy redirect('/x', 200),
-// abort(302) o abort(999) se aceptan y Response::send emitiría un Location con 200 o la vista 500
-// con un 3xx. Ningún llamador lo hace (todos usan constantes), pero el contrato de D-57 es
-// "redirect = 3xx con Location; abort = error": se fija acá. FALLA hasta que se valide.
+// Regresión del hallazgo 3 de A2-11 (corregido en d648f11): redirect solo con 3xx y abort solo con
+// códigos de error.
 test('redirect solo con status 3xx; abort solo con 4xx/5xx (InvalidArgumentException)', function () {
-    if (!hayHttpException()) {
-        pending('App\Core\HttpException no existe todavía (R-2, A1-13)');
-    }
     foreach ([200, 204, 400, 500, 299, 400] as $s) {
         assertThrows(InvalidArgumentException::class, fn () => Response::redirect('/x', $s), "redirect con {$s}");
     }

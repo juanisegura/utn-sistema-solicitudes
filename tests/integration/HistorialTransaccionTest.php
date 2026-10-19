@@ -6,7 +6,7 @@ declare(strict_types=1);
 // SELECT estado … FOR UPDATE; igual al nuevo → no-op sin evento (sigue 302 + flash); distinto →
 // UPDATE + INSERT del evento (admin_id, estado_anterior, estado_nuevo); id inexistente → 404.
 // FK solicitud ON DELETE CASCADE, FK admin ON DELETE RESTRICT.
-// PENDIENTE mientras no exista la tabla solicitud_eventos. Cada caso trabaja sobre una solicitud
+// Cada caso trabaja sobre una solicitud
 // propia (INSERT directo) y la borra al final: no altera el seed.
 
 function requiereHistorial(): void
@@ -14,7 +14,7 @@ function requiereHistorial(): void
     requiereServidor();
     requiereDb();
     if (!tablaExiste('solicitud_eventos')) {
-        pending('tabla solicitud_eventos no existe todavía (M-2, A1-10)');
+        fail('falta la tabla solicitud_eventos (M-2)');
     }
 }
 
@@ -166,20 +166,57 @@ test('FK: un admin con eventos no se puede borrar (RESTRICT)', function () {
     }
 });
 
-// El orden (más reciente primero) se verifica en A2-08 contra el markup real de A1-10.
-test('el detalle muestra "Sin cambios…" y después los cambios', function () {
+/**
+ * Ítems del historial tal como los renderiza app/Views/admin/solicitudes/show.php: dentro de
+ * <ol class="timeline">, cada <li class="timeline-item …"> trae dos badges (anterior → nuevo).
+ * Se busca solo dentro de esa lista: el <select> del formulario también contiene los nombres de
+ * los estados (por eso el test anterior no probaba nada, Q-09).
+ *
+ * @return list<array{0: string, 1: string}>|null null si no hay <ol class="timeline">
+ */
+function itemsHistorial(string $html): ?array
+{
+    if (preg_match('#<ol class="timeline">(.*?)</ol>#s', $html, $ol) !== 1) {
+        return null;
+    }
+    preg_match_all('#<li class="timeline-item[^"]*">(.*?)</li>#s', $ol[1], $lis);
+    $items = [];
+    foreach ($lis[1] as $li) {
+        preg_match_all('#class="badge badge-([a-z_]+)"#', $li, $b);
+        $items[] = $b[1];
+    }
+
+    return $items;
+}
+
+test('historial: sin eventos muestra "Sin cambios…" y ninguna lista', function () {
     requiereHistorial();
     $c = adminLogueado();
     $id = solicitudPropia();
     try {
-        $sinCambios = $c->get("/admin/solicitudes/{$id}")['body'];
-        assertContains('Sin cambios de estado todavía.', $sinCambios);
-        cambiarEstado($c, $id, 'en_proceso');
-        cambiarEstado($c, $id, 'resuelta');
         $html = $c->get("/admin/solicitudes/{$id}")['body'];
-        $posResuelta = strpos($html, 'Resuelta', (int) strpos($html, 'Historial'));
-        $posProceso = strpos($html, 'En proceso', (int) strpos($html, 'Historial'));
-        assertTrue($posResuelta !== false && $posProceso !== false, 'ambos cambios visibles');
+        assertContains('Sin cambios de estado todavía.', $html);
+        assertNull(itemsHistorial($html), 'sin <ol class="timeline">');
+    } finally {
+        borrarSolicitud($id);
+    }
+});
+
+test('historial: renderiza un ítem por cambio, más reciente primero, con anterior → nuevo', function () {
+    requiereHistorial();
+    $c = adminLogueado();
+    $id = solicitudPropia();
+    try {
+        assertSame(302, cambiarEstado($c, $id, 'en_proceso')['code']);
+        assertSame(302, cambiarEstado($c, $id, 'resuelta')['code']);
+        assertSame(302, cambiarEstado($c, $id, 'resuelta')['code'], 'no-op: no agrega ítem');
+        $html = $c->get("/admin/solicitudes/{$id}")['body'];
+        assertFalse(str_contains($html, 'Sin cambios de estado todavía.'));
+        assertSame(
+            [['en_proceso', 'resuelta'], ['pendiente', 'en_proceso']],
+            itemsHistorial($html),
+            'dos ítems, el último cambio primero'
+        );
     } finally {
         borrarSolicitud($id);
     }
