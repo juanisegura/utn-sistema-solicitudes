@@ -352,3 +352,60 @@ implementación, revisión adversarial, corrida oficial del orquestador.
 | A1-10 | AGENTE 1 | M-2, M-3, M-4 (panel) | A2-08 |
 | A2-08 | AGENTE 2 | Pruebas de M-1..M-5 contra contrato (unit/integración/smoke) | A1-10 |
 | A2-09 | AGENTE 2 | Revisión adversarial de toda la fase de mejoras | — |
+
+## 6. Segunda fase de mejoras (pedido de Juan, 2026-10-19, D-55)
+
+### R-1 Búsqueda con índice FULLTEXT (D-56)
+
+- Índice `FULLTEXT ft_busqueda (asunto, nombre, email, descripcion)` en `solicitudes`
+  (InnoDB, utf8mb4; MySQL 8 y MariaDB ≥ 10.6).
+- **Híbrido, para no cambiar el contrato de M-3** (subcadena literal, `%` y `_` sin
+  comodín): de `q` se extraen las palabras indexables (secuencias de letras/dígitos Unicode
+  de ≥ 3 caracteres que no estén en la lista de stopwords por defecto de InnoDB, que es la
+  misma en MySQL y MariaDB e incluye `de`, `en`, `la`, `com`); si hay al menos una, el WHERE
+  es `MATCH(asunto, nombre, email, descripcion) AGAINST(? IN BOOLEAN MODE)` con
+  `+palabra*` por cada una (prefijo, todas obligatorias; operadores booleanos del usuario
+  escapados/eliminados) **AND** el `LIKE … ESCAPE ?` actual como confirmación exacta. Si no
+  hay ninguna palabra indexable (por ejemplo `%`, `a_b`, `de`), se usa solo el `LIKE` actual
+  (scan completo, aceptado para ese caso).
+- Consecuencia aceptada: una subcadena **en medio** de una palabra (`ampus` en `campus`) ya
+  no encuentra resultados cuando `q` tiene palabras indexables (la búsqueda pasa a ser por
+  palabra/prefijo). Se documenta en la UI ("Buscá por palabras") y en el ADR.
+- `countByEstado(q)` y `contar(q)` usan exactamente el mismo filtro.
+- Verificación: `EXPLAIN` muestra `type=fulltext` (o equivalente en MariaDB) con
+  `key=ft_busqueda` para una búsqueda con palabras; resultados idénticos a la versión LIKE
+  para todos los casos B del smoke.
+
+### R-2 `RouteMatcher` y despacho sin `exit` (D-57)
+
+- `App\Core\RouteMatcher` (pura, sin `$_SERVER`, sin salida): `match(string $method,
+  string $path): RouteMatch` → objeto inmutable con `status` (200 | 404 | 405), y según el
+  caso `handler`, `params` (ints), `options`, o `allow` (lista para el header `Allow`, con
+  HEAD si hay GET). Absorbe la regex de `{id}` (`$D`, `[1-9][0-9]{0,9}`).
+- `Router::dispatch()` deja de terminar el proceso: usa `RouteMatcher`, aplica sesión →
+  auth → CSRF y ejecuta el controller. Los cortes de flujo (`Response::abort()` y
+  `Response::redirect()`) **lanzan** una excepción de control (`App\Core\HttpException` con
+  status y headers; `App\Core\RedirectException` o la misma con `Location`) en vez de
+  `exit`. Un único punto (`public_html/index.php` o un `App\Core\Kernel::handle()`) las
+  captura y emite la respuesta (vista de error o redirect). Ningún `exit`/`die` en `app/`
+  salvo el front controller y los scripts CLI.
+- Las excepciones de control **no** se loguean como errores ni pasan por la vista 500.
+- Los tests de Router dejan de necesitar Reflection y procesos hijo.
+
+### R-3 `Database` sin lectura propia de la configuración (D-58)
+
+- Se elimina `Database::loadConfig()`: `Database::pdo()` sin `configure()` previo →
+  `LogicException` clara. `bootstrap.php` configura `Database` desde `Config`.
+- Bootstrap mínimo para CLI (`app/bootstrap-cli.php`): autoload, helpers, timezone,
+  `Config::configure(require config.php)` y `Database::configure(Config::get('db'))`, sin
+  sesión ni headers ni handlers HTTP. Lo usan `scripts/instalar-db.php`,
+  `scripts/crear-admin.php` y los tests que tocan la DB (`tests/lib`), en vez de cargar la
+  config cada uno a su manera. Nadie imprime la config.
+
+### Reparto
+
+| Tarea | Responsable | Contenido | En paralelo con |
+|-------|-------------|-----------|-----------------|
+| A1-13 | AGENTE 1 | R-1, R-2, R-3 (turno de DB) | A2-10 |
+| A2-10 | AGENTE 2 | Tests contra el contrato: `RouteMatcher` puro, dispatch sin hijo, `Database` sin configure, búsqueda FULLTEXT (unit de extracción de palabras + integración con EXPLAIN y casos de borde); `tests/lib` pasa a `bootstrap-cli.php` | A1-13 |
+| A2-11 | AGENTE 2 | Revisión adversarial de A1-13 + corrida | — |
