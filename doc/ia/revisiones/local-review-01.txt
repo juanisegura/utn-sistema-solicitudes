@@ -1,0 +1,36 @@
+🔎 utn-sistema-solicitudes: 36 archivos, 6 llamada(s) a qwen2.5-coder:7b [php=30, sql=2, other=1, config=1, shell=1, python=1] · commits fa60cf3...HEAD
+   1/6 [config] 1 archivo(s) · 1 hallazgo(s) · 10s
+   2/6 [other] 1 archivo(s) · 0 hallazgo(s) · 13s
+   3/6 [php] 30 archivo(s) · 0 hallazgo(s) · 16s
+   4/6 [python] 1 archivo(s) · 1 hallazgo(s) · 9s
+   5/6 [shell] 1 archivo(s) · 1 hallazgo(s) · 12s
+   6/6 [sql] 2 archivo(s) · 3 hallazgo(s) · 13s
+Proyecto: utn-sistema-solicitudes  ·  alcance: commits fa60cf3...HEAD
+Árbol revisado: 454bca9e0adb850475730d659d34aaf06b23a1aa  ·  modelo: qwen2.5-coder:7b  ·  estado: reviewed
+Stacks: php=30, sql=2, other=1, config=1, shell=1, python=1
+Chequeos estáticos: secretos, php -l, ruff, bash -n
+
+Herramientas deterministas (confiables): 0
+
+LLM con evidencia en el diff (la línea existe; el razonamiento hay que confirmarlo): 6
+  [info] database/schema.sql:7 (llm, evidence_found)
+      La migración borra las tablas existentes, lo que puede causar pérdida de datos si no se ha respaldado previamente.
+      → Considera usar una migración idempotente para crear las tablas sin borrarlas primero.
+  [info] database/schema.sql:8 (llm, evidence_found)
+      La migración borra las tablas existentes, lo que puede causar pérdida de datos si no se ha respaldado previamente.
+      → Considera usar una migración idempotente para crear las tablas sin borrarlas primero.
+  [info] database/seed.sql:21 (llm, evidence_found)
+      El contenido HTML potencialmente peligroso se inserta en la base de datos, lo que podría ser una inyección XSS.
+      → Sanitiza el contenido antes de insertarlo en la base de datos para evitar inyecciones XSS.
+  [info] public_html/.htaccess:22 (llm, evidence_found)
+      The 'X-Powered-By' header reveals the technology stack used by the application, which can be a security risk.
+      → Consider removing or commenting out this line to avoid revealing sensitive information.
+  [info] tests/smoke.sh:7 (llm, evidence_found)
+      The script does not use 'eval' with user input, which is a good practice to avoid command injection.
+      → No specific action required as the script does not use 'eval'.
+  [info] tools/registrar-prompt.py:38 (llm, evidence_found)
+      La variable de entorno 'TIPO' no está documentada y su valor por defecto es 'prompt'. Es recomendable agregar una explicación sobre qué valores puede tomar esta variable.
+      → Añadir un comentario explicando la variable de entorno 'TIPO' y los posibles valores que puede tomar.
+
+LLM sin evidencia (probable confabulación; descartar salvo confirmación): 0
+exit=0
