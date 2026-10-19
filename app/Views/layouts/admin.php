@@ -16,7 +16,8 @@ $hojas = [
     'base/tokens', 'base/reset', 'base/global',
     'layout/header', 'layout/page',
     'components/forms', 'components/buttons', 'components/alerts', 'components/badges', 'components/table',
-    'pages/auth', 'pages/admin',
+    'components/historial',
+    'pages/admin',
 ];
 ?>
 <!doctype html>

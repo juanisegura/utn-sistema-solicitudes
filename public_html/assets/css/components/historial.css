@@ -1,6 +1,5 @@
 /* Datos y línea de tiempo de una solicitud, compartidos por el detalle del panel y el seguimiento
-   público (F-3). pages/admin.css todavía repite estas reglas: se quitan de ahí cuando el layout del
-   panel cargue esta hoja. */
+   público (F-3). Lo propio de cada página (p. ej. .history del panel) queda en su hoja. */
 .meta { margin: 0 0 var(--space-5); }
 .meta > div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
 .meta > div:first-child { padding-top: 0; }

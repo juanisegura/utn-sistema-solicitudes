@@ -43,11 +43,6 @@
 .detail-title { font-size: var(--fs-xl); overflow-wrap: anywhere; max-width: 40ch; }
 .prose { font-size: var(--fs-md); line-height: 1.65; max-width: 68ch; overflow-wrap: anywhere; }
 .detail-side { border-top: 1px solid var(--line); padding-top: var(--space-5); }
-.meta { margin: 0 0 var(--space-5); }
-.meta > div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
-.meta > div:first-child { padding-top: 0; }
-.meta dt { color: var(--ink-3); font-size: var(--fs-sm); }
-.meta dd { margin: 0; }
 /* Email: corta en el <wbr> antes de la "@"; solo parte una palabra si sola no entra. */
 .meta dd.break { overflow-wrap: break-word; }
 .estado-form { margin-top: 0; }
@@ -72,29 +67,9 @@
 .btn.is-disabled { color: var(--ink-3); border-color: var(--line); cursor: default; }
 .btn.is-disabled:hover { background: transparent; border-color: var(--line); color: var(--ink-3); }
 
-/* Historial del detalle: línea de tiempo con riel fino y punto del color del estado nuevo. */
+/* Historial del detalle: separado del contenido por una hairline. La línea de tiempo está en
+   components/historial.css (también la usa el seguimiento público). */
 .history { margin-top: var(--space-7); padding-top: var(--space-5); border-top: 1px solid var(--line); max-width: 68ch; }
-.timeline { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
-.timeline-item {
-  --dot: var(--line-strong);
-  position: relative; display: grid; gap: .3rem;
-  padding: 0 0 var(--space-5) 1.75rem;
-}
-.timeline-item::before {
-  content: ""; position: absolute; left: .3rem; top: .45rem;
-  width: .6rem; height: .6rem; border-radius: 50%; background: var(--dot);
-}
-.timeline-item::after {
-  content: ""; position: absolute; left: calc(.6rem - 1px); top: 1.35rem; bottom: .2rem;
-  width: 2px; background: var(--line);
-}
-.timeline-pendiente  { --dot: var(--pend-dot); }
-.timeline-en_proceso { --dot: var(--proc-dot); }
-.timeline-resuelta   { --dot: var(--res-dot); }
-.timeline-change { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
-.timeline-arrow { color: var(--ink-3); }
-.timeline-meta { color: var(--ink-3); font-size: var(--fs-sm); }
-.timeline-origin { margin: 0; padding-left: 1.75rem; }
 
 @media (min-width: 640px) {
   .estado-form .btn { width: auto; }
