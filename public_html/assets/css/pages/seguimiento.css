@@ -1,0 +1,17 @@
+/* Seguimiento público (F-3): código en /gracias, formulario de consulta y resultado. */
+
+/* El código se lee y se copia a mano: monoespaciado, grande, y un clic lo selecciona entero. */
+.codigo-box { margin: 0 0 var(--space-6); padding-left: var(--space-4); border-left: 3px solid var(--accent); }
+.codigo-box p { margin: 0; }
+.codigo-box .note { margin-top: var(--space-3); }
+.codigo {
+  display: inline-block; margin-top: var(--space-2);
+  font-family: var(--mono); font-size: clamp(1.05rem, .9rem + .7vw, 1.375rem); font-weight: 600;
+  letter-spacing: .04em; color: var(--ink); overflow-wrap: anywhere;
+  user-select: all;
+}
+.codigo-input { font-family: var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.codigo-input::placeholder { text-transform: none; }
+
+/* El asunto lo escribió quien pidió ayuda: puede ser largo o sin espacios. */
+.split-intro .display { overflow-wrap: anywhere; }

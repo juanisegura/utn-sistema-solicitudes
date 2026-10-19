@@ -28,15 +28,46 @@ final class Solicitud
         'when', 'where', 'who', 'will', 'with', 'und', 'www',
     ];
 
-    /** Recibe datos ya validados; devuelve el id generado. */
-    public static function create(string $nombre, string $email, string $asunto, string $descripcion): int
+    /**
+     * Recibe datos ya validados y el hash del código de seguimiento (F-3: nunca el código);
+     * devuelve el id generado.
+     */
+    public static function create(string $nombre, string $email, string $asunto, string $descripcion, ?string $seguimientoHash = null): int
     {
         Database::execute(
-            'INSERT INTO solicitudes (nombre, email, asunto, descripcion) VALUES (?, ?, ?, ?)',
-            [$nombre, $email, $asunto, $descripcion]
+            'INSERT INTO solicitudes (nombre, email, asunto, descripcion, seguimiento_hash) VALUES (?, ?, ?, ?, ?)',
+            [$nombre, $email, $asunto, $descripcion, $seguimientoHash]
         );
 
         return Database::lastInsertId();
+    }
+
+    /**
+     * Datos de la consulta pública (F-3, ADR-0013): solo lo que puede ver quien tiene el código.
+     * Nunca nombre, email ni descripción. seguimiento_hash va para la comparación del controlador.
+     *
+     * @return array{id: int, asunto: string, estado: string, created_at: string, updated_at: string, seguimiento_hash: ?string}|null
+     */
+    public static function paraSeguimiento(int $id): ?array
+    {
+        return Database::fetchOne(
+            'SELECT id, asunto, estado, created_at, updated_at, seguimiento_hash FROM solicitudes WHERE id = ?',
+            [$id]
+        );
+    }
+
+    /**
+     * Historial para la consulta pública, más reciente primero: sin el admin que hizo el cambio.
+     *
+     * @return list<array{estado_anterior: string, estado_nuevo: string, created_at: string}>
+     */
+    public static function historialPublico(int $id): array
+    {
+        return Database::fetchAll(
+            'SELECT estado_anterior, estado_nuevo, created_at FROM solicitud_eventos
+             WHERE solicitud_id = ? ORDER BY created_at DESC, id DESC',
+            [$id]
+        );
     }
 
     /**

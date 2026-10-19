@@ -21,4 +21,6 @@
   .split { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 0; align-items: start; }
   .split-intro { padding-right: var(--space-8); }
   .split-main { padding-left: var(--space-8); border-left: 1px solid var(--line); min-height: 100%; }
+  /* Formularios cortos (login, contraseña, seguimiento): la columna no se estira a todo el ancho. */
+  .split-narrow > * { max-width: 30rem; }
 }

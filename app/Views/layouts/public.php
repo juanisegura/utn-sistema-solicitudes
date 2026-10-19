@@ -10,8 +10,8 @@
 $hojas = [
     'base/tokens', 'base/reset', 'base/global',
     'layout/header', 'layout/page',
-    'components/forms', 'components/buttons', 'components/alerts',
-    'pages/solicitud', 'pages/errors',
+    'components/forms', 'components/buttons', 'components/alerts', 'components/badges', 'components/historial',
+    'pages/solicitud', 'pages/seguimiento', 'pages/errors',
 ];
 ?>
 <!doctype html>
@@ -29,7 +29,10 @@ $hojas = [
     <header class="site-header">
         <div class="wrap header-row">
             <a class="brand" href="/"><?php require __DIR__ . '/../partials/marca.php'; ?>Mesa de ayuda</a>
-            <a class="header-link" href="/admin/login">Acceso del equipo</a>
+            <nav class="header-nav" aria-label="Sitio">
+                <a class="header-link" href="/seguimiento">Consultar el estado de una solicitud</a>
+                <a class="header-link" href="/admin/login">Acceso del equipo</a>
+            </nav>
         </div>
     </header>
     <main id="contenido" class="wrap page">

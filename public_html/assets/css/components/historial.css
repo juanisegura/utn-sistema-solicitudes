@@ -1,0 +1,31 @@
+/* Datos y línea de tiempo de una solicitud, compartidos por el detalle del panel y el seguimiento
+   público (F-3). pages/admin.css todavía repite estas reglas: se quitan de ahí cuando el layout del
+   panel cargue esta hoja. */
+.meta { margin: 0 0 var(--space-5); }
+.meta > div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+.meta > div:first-child { padding-top: 0; }
+.meta dt { color: var(--ink-3); font-size: var(--fs-sm); }
+.meta dd { margin: 0; }
+
+/* Línea de tiempo con riel fino y punto del color del estado nuevo. */
+.timeline { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+.timeline-item {
+  --dot: var(--line-strong);
+  position: relative; display: grid; gap: .3rem;
+  padding: 0 0 var(--space-5) 1.75rem;
+}
+.timeline-item::before {
+  content: ""; position: absolute; left: .3rem; top: .45rem;
+  width: .6rem; height: .6rem; border-radius: 50%; background: var(--dot);
+}
+.timeline-item::after {
+  content: ""; position: absolute; left: calc(.6rem - 1px); top: 1.35rem; bottom: .2rem;
+  width: 2px; background: var(--line);
+}
+.timeline-pendiente  { --dot: var(--pend-dot); }
+.timeline-en_proceso { --dot: var(--proc-dot); }
+.timeline-resuelta   { --dot: var(--res-dot); }
+.timeline-change { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.timeline-arrow { color: var(--ink-3); }
+.timeline-meta { color: var(--ink-3); font-size: var(--fs-sm); }
+.timeline-origin { margin: 0; padding-left: 1.75rem; }

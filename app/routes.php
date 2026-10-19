@@ -8,12 +8,15 @@ declare(strict_types=1);
 use App\Controllers\Admin\AuthController;
 use App\Controllers\Admin\CuentaController;
 use App\Controllers\Admin\SolicitudAdminController;
+use App\Controllers\SeguimientoController;
 use App\Controllers\SolicitudController;
 
 return [
     ['GET',  '/',            [SolicitudController::class, 'create']],
     ['POST', '/solicitudes', [SolicitudController::class, 'store']],
     ['GET',  '/gracias',     [SolicitudController::class, 'gracias']],
+    ['GET',  '/seguimiento', [SeguimientoController::class, 'create']],
+    ['POST', '/seguimiento', [SeguimientoController::class, 'show']],
 
     ['GET',  '/admin/login',                   [AuthController::class, 'showLogin']],
     ['POST', '/admin/login',                   [AuthController::class, 'login']],

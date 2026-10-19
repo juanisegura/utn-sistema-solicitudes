@@ -16,6 +16,13 @@ límite de intentos de login.
 - **Límite de envíos** por IP (5 cada 10 minutos → 429 con `Retry-After`) y un campo trampa
   (*honeypot*) invisible para personas: si un bot lo completa, recibe una confirmación genérica
   y no se guarda nada.
+- **Seguimiento** (`/seguimiento`, link «Consultar el estado de una solicitud»): al enviar la
+  solicitud se muestra, una sola vez, un código de seguimiento de 128 bits (26 caracteres en
+  grupos de 4). Con el número y ese código se ve el asunto, el estado y el historial, sin
+  nombre, email, descripción ni quién hizo cada cambio. En la DB queda solo el SHA-256 del
+  código. Número inexistente, sin código o código incorrecto dan el mismo error, y los intentos
+  fallidos tienen límite por IP (10 cada 15 minutos → 429)
+  ([ADR-0013](doc/adr/0013-seguimiento-publico-codigo.md)).
 
 **Panel administrativo** (`/admin`)
 - Login y logout de administrador, con **límite de intentos**: 5 fallos por IP + email
@@ -29,9 +36,11 @@ límite de intentos de login.
 - Todas las páginas y operaciones del panel exigen sesión de administrador.
 
 **Registro de seguridad**: logins correctos, fallidos y bloqueados, CSRF inválido, accesos al
-panel sin sesión, envíos bloqueados, honeypot y cambios de contraseña quedan en
+panel sin sesión, envíos bloqueados, honeypot, consultas de seguimiento (correctas, fallidas y
+bloqueadas, con el número pero nunca el código) y cambios de contraseña quedan en
 `storage/logs/security.log` (con la misma rotación que el log de errores). Nunca se registran
-contraseñas, cuerpos ni query strings; el email aparece solo como un prefijo de su SHA-256.
+contraseñas, códigos de seguimiento, cuerpos ni query strings; el email aparece solo como un
+prefijo de su SHA-256.
 
 ## Requisitos
 
@@ -132,6 +141,8 @@ producción no hace falta definirla.
 | `por_pagina` | `20` | entero 1–100 | Solicitudes por página en el panel |
 | `form_max_por_ip` | `5` | entero ≥ 1 | Envíos del formulario público por IP en la ventana |
 | `form_ventana_seg` | `600` | entero ≥ 1 | Ventana del límite de envíos, en segundos |
+| `seguimiento_max_por_ip` | `10` | entero ≥ 1 | Consultas de seguimiento **fallidas** por IP en la ventana (las correctas no cuentan) |
+| `seguimiento_ventana_seg` | `900` | entero ≥ 1 | Ventana del límite de consultas, en segundos |
 
 ## Apache
 

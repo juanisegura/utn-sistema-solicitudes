@@ -1,4 +1,2 @@
-/* Login: la columna del formulario no se estira a todo el ancho disponible. */
-@media (min-width: 960px) {
-  .split-narrow > * { max-width: 30rem; }
-}
+/* Vacía: .split-narrow pasó a layout/page.css (también la usa el seguimiento público, F-3).
+   Se borra junto con su <link> en layouts/admin.php. */

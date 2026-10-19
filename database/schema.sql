@@ -38,6 +38,10 @@ CREATE TABLE solicitudes (
     estado       ENUM('pendiente','en_proceso','resuelta') NOT NULL DEFAULT 'pendiente',
     created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- Seguimiento público (F-3, ADR-0013): SHA-256 hex del código normalizado, nunca el código.
+    -- NULL = sin código (seed y solicitudes previas): no se puede consultar. Se busca por id (PK),
+    -- así que no lleva índice propio.
+    seguimiento_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL DEFAULT NULL,
     PRIMARY KEY (id),
     -- Cubre el listado del panel: filtro por estado ordenado por fecha.
     KEY idx_estado_fecha (estado, created_at),
