@@ -1,0 +1,118 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Core;
+
+/** Sesión endurecida + flash messages + old input. Un único punto de configuración de la cookie. */
+final class Session
+{
+    public const NAME = 'utn_sesion';
+
+    private const LAST_ACTIVITY = '_last_activity';
+    private const FLASH = '_flash';
+    private const OLD = '_old';
+
+    private static int $idleTimeout = 1800;
+
+    /** @var array<string, string> old input de la request anterior (se consume al arrancar) */
+    private static array $old = [];
+
+    /** @param int $idleTimeout segundos sin actividad tras los que la sesión se vacía (app.session_timeout) */
+    public static function start(int $idleTimeout): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            return;
+        }
+        ini_set('session.use_strict_mode', '1');   // rechaza IDs que el servidor no emitió (fixation)
+        ini_set('session.use_only_cookies', '1');
+        ini_set('session.use_trans_sid', '0');
+        session_name(self::NAME);
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path'     => '/',
+            'secure'   => Request::isHttps(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+        session_start();
+
+        self::$idleTimeout = $idleTimeout;
+        self::expireIfIdle();
+        self::$old = $_SESSION[self::OLD] ?? [];
+        unset($_SESSION[self::OLD]);
+    }
+
+    /** Llamar al cambiar de privilegio (login): nuevo ID, mismos datos, el viejo se borra. */
+    public static function regenerate(): void
+    {
+        session_regenerate_id(true);
+    }
+
+    public static function destroy(): void
+    {
+        $_SESSION = [];
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $params = session_get_cookie_params();
+            setcookie(self::NAME, '', [
+                'expires'  => time() - 3600,
+                'path'     => $params['path'],
+                'secure'   => $params['secure'],
+                'httponly' => $params['httponly'],
+                'samesite' => $params['samesite'],
+            ]);
+            session_destroy();
+        }
+    }
+
+    public static function get(string $key, mixed $default = null): mixed
+    {
+        return $_SESSION[$key] ?? $default;
+    }
+
+    public static function set(string $key, mixed $value): void
+    {
+        $_SESSION[$key] = $value;
+    }
+
+    public static function forget(string $key): void
+    {
+        unset($_SESSION[$key]);
+    }
+
+    public static function flash(string $key, mixed $value): void
+    {
+        $_SESSION[self::FLASH][$key] = $value;
+    }
+
+    /** Lee y borra: el mensaje se muestra una sola vez. */
+    public static function pullFlash(string $key): mixed
+    {
+        $value = $_SESSION[self::FLASH][$key] ?? null;
+        unset($_SESSION[self::FLASH][$key]);
+
+        return $value;
+    }
+
+    /** @param array<string, string> $input valores a re-mostrar tras un redirect (nunca passwords) */
+    public static function flashInput(array $input): void
+    {
+        $_SESSION[self::OLD] = $input;
+    }
+
+    public static function old(string $key): string
+    {
+        return self::$old[$key] ?? '';
+    }
+
+    private static function expireIfIdle(): void
+    {
+        $now = time();
+        $last = $_SESSION[self::LAST_ACTIVITY] ?? null;
+        if (is_int($last) && $now - $last > self::$idleTimeout) {
+            $_SESSION = [];
+            session_regenerate_id(true);
+        }
+        $_SESSION[self::LAST_ACTIVITY] = $now;
+    }
+}

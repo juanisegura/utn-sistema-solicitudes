@@ -17,13 +17,19 @@ cantidad de features.
 
 - **Orquestador** (otra sesión de Claude Code): planifica, redacta los prompts, verifica e
   integra. Decide qué hallazgos se aceptan.
-- **AGENTE 1 UTN — implementador**: escribe código, SQL, README y ADRs que se le pidan.
+- **AGENTE 1 UTN — implementador**: escribe código, SQL y README; redacta el texto de los ADRs que se le pidan.
 - **AGENTE 2 UTN — revisor/QA**: revisa adversarialmente y escribe/ejecuta pruebas. **No
   corrige código de la app**: reporta hallazgos (archivo:línea, escenario concreto,
   severidad, fix sugerido) y escribe solo en `tests/` y `doc/pruebas/`.
 - Cada prompt trae un ID (`[A1-03]`, `[A2-01]`). Mencioná ese ID en tu respuesta final.
-- Los prompts se registran automáticamente en `doc/ia/registro/` (hook). **No editar ni
-  borrar nada en `doc/ia/`** — lo mantiene el orquestador.
+- **Modo C**: el orquestador es la sesión `cerebro-personal-b4` y envía los prompts por
+  mensaje entre sesiones; la respuesta final se devuelve con `SendMessage` a esa sesión.
+  Cada agente delega lo mecánico en subagentes propios (Sonnet; Haiku solo para
+  documentación derivada, **nunca** seguridad), un subagente por tarea, y revisa lo que
+  recibe. Un escritor por archivo: cada prompt define la reserva de archivos.
+- Los prompts y respuestas se registran en `doc/ia/registro/`. **No editar ni borrar nada
+  en `doc/ia/` ni en `doc/adr/`**: el texto de un ADR se manda en la respuesta y lo
+  integra el orquestador.
 - Hacé exactamente el alcance del prompt. Si algo del plan te parece incorrecto, decilo
   en la respuesta en vez de desviarte en silencio: las sugerencias descartadas también se
   documentan.

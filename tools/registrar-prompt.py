@@ -5,6 +5,8 @@ Registra textualmente cada prompt enviado a AGENTE 1 UTN / AGENTE 2 UTN en
 doc/ia/registro/ (condición del TP: documentar todos los prompts utilizados).
 
 - Solo se invoca si la sesión fue lanzada con la variable AGENTE (ver CLAUDE.md).
+- El orquestador también lo usa para registrar lo que envía por mensaje y lo que
+  cada agente devuelve: TIPO=prompt|respuesta, VIA=hook|orquestador.
 - Escribe dos formatos: JSONL (fuente fiel, una línea por prompt) y Markdown
   (lectura humana).
 - Nunca escribe en stdout: en UserPromptSubmit lo que se imprime se inyecta como
@@ -33,9 +35,13 @@ def main() -> None:
     prompt = SECRET_RE.sub(r"\1\2\3[REDACTADO]\3", data.get("prompt", ""))
     ahora = datetime.now().astimezone()
     match = ID_RE.search(prompt)
+    tipo = os.environ.get("TIPO", "prompt")
+    via = os.environ.get("VIA", "hook")
     registro = {
         "ts": ahora.isoformat(timespec="seconds"),
         "agente": agente,
+        "tipo": tipo,
+        "via": via,
         "id": match.group(1) if match else None,
         "session_id": data.get("session_id"),
         "prompt": prompt,
@@ -47,7 +53,7 @@ def main() -> None:
         f.write(json.dumps(registro, ensure_ascii=False) + "\n")
     with open(REGISTRO / f"{dia}.md", "a", encoding="utf-8") as f:
         f.write(
-            f"\n## {registro['id'] or '(sin ID)'} · {agente} · {ahora.strftime('%H:%M:%S')}\n\n"
+            f"\n## {registro['id'] or '(sin ID)'} · {tipo} · {agente} · {via} · {ahora.strftime('%H:%M:%S')}\n\n"
             f"````text\n{prompt}\n````\n"
         )
 

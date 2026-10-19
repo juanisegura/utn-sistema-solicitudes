@@ -84,7 +84,7 @@ doc/       PLAN.md · RESUMEN-TECNICO.md · adr/ · ia/ · pruebas/
 ```
 
 Convenciones: PHP ≥ 8.2, `declare(strict_types=1);`, namespaces `App\…` con autoloader
-propio de ~10 líneas en `bootstrap.php` (sin Composer: no hay dependencias que lo
+propio de ~10 líneas en `app/autoload.php` (lo requieren `bootstrap.php` y los scripts CLI) (sin Composer: no hay dependencias que lo
 justifiquen, ver ADR-0001). Nombres de dominio en español (Solicitud, Estado); infraestructura
 en inglés (Router, Request). Sin lógica ni SQL en vistas.
 
@@ -101,6 +101,20 @@ en inglés (Router, Request). Sin lógica ni SQL en vistas.
 | GET | `/admin` | SolicitudAdminController@index | auth |
 | GET | `/admin/solicitudes/{id}` | SolicitudAdminController@show | auth |
 | POST | `/admin/solicitudes/{id}/estado` | SolicitudAdminController@updateEstado | auth + CSRF |
+
+### Contrato de formularios (fijado para implementación y pruebas)
+
+| Formulario | Campos (`name`) |
+|------------|-----------------|
+| Todos los POST | `csrf_token` (hidden) |
+| Nueva solicitud | `nombre`, `email`, `asunto`, `descripcion` |
+| Login | `email`, `password` |
+| Cambio de estado | `estado` (select con los 3 valores de `Estado`) |
+| Logout | solo `csrf_token` |
+
+Límites de validación = columnas: nombre ≤100, email ≤254 y formato válido, asunto ≤150,
+descripción ≤5000; todos obligatorios tras `trim`. Mensajes de error por campo junto al
+input y resumen arriba del formulario (`role="alert"`).
 
 ### Modelo de datos (MySQL 8 / MariaDB ≥ 10.6, InnoDB, utf8mb4_unicode_ci)
 
@@ -147,11 +161,20 @@ en el SQL) + ~8 solicitudes ficticias repartidas en los 3 estados, con dominios
 
 ### Códigos HTTP
 
+- **Orden de controles por ruta** (D-16): método/ruta (404/405) → **auth** (rutas `auth`) →
+  **CSRF** (rutas POST `csrf`) → controller. Una operación admin anónima se rechaza por
+  falta de sesión sin depender del token.
+- Admin sin sesión: **GET → 302** a `/admin/login`; **POST → 401** con vista de error (no se
+  redirige un POST: se perdería la operación y el código no reflejaría el rechazo) (D-17).
+- Filtro `?estado=` fuera de la lista blanca: **400** con mensaje; vacío o ausente = todas (D-18).
+- Cambio de estado exitoso: **302 al detalle** con flash "Estado actualizado" (D-19).
+- Listado ordenado por `created_at DESC, id DESC`, sin paginación (D-20).
+- Timeout de inactividad configurable: `app.session_timeout` (segundos, default 1800) (D-21).
+- Si se implementa límite de login (extra 1): por IP+email, ≥5 intentos fallidos en 15 min (D-22).
 - Validación fallida del formulario público: **422** re-renderizando el form con errores y
   valores previos escapados.
 - Credenciales incorrectas: **401** con mensaje genérico ("Email o contraseña incorrectos").
-- Admin sin sesión: **302** a `/admin/login` (GET) / **401** o redirect en POST, sin ejecutar la acción.
-- CSRF inválido: **419**. Estado fuera de lista blanca: **422**. ID inexistente: **404**.
+- CSRF inválido: **419**. Estado fuera de lista blanca: **422**. ID inexistente: **404** (también en el POST de estado: `updateEstado()` devuelve false solo si el id no existe, ver ADR-0003).
   Método no permitido: **405** + `Allow`.
 
 ## ADRs previstos (`doc/adr/`)
