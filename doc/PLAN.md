@@ -42,6 +42,7 @@ toda la lógica vive en `app/`, fuera del alcance HTTP. Ver ADR-0001.
 
 ```
 app/
+├── helpers.php              # e(): escape HTML único
 ├── bootstrap.php            # config, manejo de errores, headers de seguridad, sesión, autoload
 ├── routes.php               # tabla [método, patrón] → [Controller, acción, middleware]
 ├── config/
@@ -55,7 +56,7 @@ app/
 │   ├── Session.php          # cookie endurecida, regenerate, timeout inactividad, flash
 │   ├── Csrf.php             # token sincronizador por sesión + hash_equals
 │   ├── Auth.php             # login/logout/requireAdmin; dummy hash anti-enumeración
-│   ├── Validator.php        # reglas required/email/max/in → [datos, errores]
+│   ├── Validator.php        # encoding UTF-8, recorte Unicode, controles; reglas required/email/max/multiline
 │   └── View.php             # render(vista, datos, layout) + helper e()
 ├── Controllers/             # namespace App\Controllers — finos, sin SQL
 │   ├── SolicitudController.php          # form, store, gracias
@@ -64,20 +65,20 @@ app/
 │       └── SolicitudAdminController.php # index (filtro), show, updateEstado
 ├── Models/                  # namespace App\Models — único lugar con SQL (preparado)
 │   ├── Solicitud.php        # create, all(estado?), find(id), updateEstado
-│   ├── Admin.php            # findByEmail, touchLastLogin
+│   ├── Admin.php            # findByEmail, find, create, updatePasswordHash, touchLastLogin
 │   └── Estado.php           # enum PHP 8.1 backed: valores + etiquetas (lista blanca)
 └── Views/
     ├── layouts/public.php · admin.php
     ├── solicitudes/create.php · gracias.php
     ├── admin/login.php · solicitudes/index.php · solicitudes/show.php
-    └── errors/403.php · 404.php · 405.php · 419.php · 500.php
+    └── errors/400.php · 401.php · 403.php · 404.php · 405.php · 419.php · 500.php
 public_html/
 ├── index.php                # front controller (y router de php -S para estáticos)
 ├── .htaccess                # rewrite al front controller + headers de seguridad
 └── assets/css/app.css
 database/  schema.sql · seed.sql
-scripts/   crear-admin.php (CLI, password por prompt oculto)
-tests/     smoke.sh (las 7 pruebas mínimas con curl) · README.md
+scripts/   instalar-db.php (schema + seed; guarda en producción) · crear-admin.php (CLI, password oculta)
+tests/     smoke.sh (67 casos por HTTP: 7 pruebas mínimas + códigos, sesión, CSRF) · README.md
 tools/     registrar-prompt.py (hook de registro de prompts)
 storage/logs/                # log de errores de la app (no versionado)
 doc/       PLAN.md · RESUMEN-TECNICO.md · adr/ · ia/ · pruebas/
@@ -194,7 +195,7 @@ en el SQL) + ~8 solicitudes ficticias repartidas en los 3 estados, con dominios
 
 | Prueba mínima (consigna §4) | Verificación |
 |-----------------------------|--------------|
-| Solicitud válida | `smoke.sh`: POST con token → 302 a `/gracias` + fila en DB |
+| Solicitud válida | `smoke.sh`: POST con token → 302 a `/gracias` + la fila aparece en el panel (verificado por HTTP) |
 | Campos inválidos/incompletos | POST vacío y email inválido → 422 + mensajes; sin fila nueva |
 | Acceso al panel sin sesión | GET `/admin` y `/admin/solicitudes/1` → 302 a login |
 | Credenciales incorrectas | POST login erróneo → 401, sin cookie de sesión autenticada |
