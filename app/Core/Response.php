@@ -29,7 +29,8 @@ final class Response
     /** Solo paths locales: evita open redirects si algún día el destino sale de la entrada. */
     public static function redirect(string $path, int $status = 302): never
     {
-        if (!str_starts_with($path, '/') || str_starts_with($path, '//')) {
+        // "/\evil.com" o con controles (CR/LF) los navegadores lo pueden interpretar como otro host.
+        if (!str_starts_with($path, '/') || str_starts_with($path, '//') || preg_match('/[\\\\\x00-\x1F\x7F]/', $path) === 1) {
             throw new InvalidArgumentException('Redirect solo a paths locales.');
         }
         header('Location: ' . $path, true, $status);

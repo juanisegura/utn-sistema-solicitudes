@@ -22,6 +22,7 @@ $bufferBase = ob_get_level();
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('log_errors', '0'); // el log lo escribe app_log() con un formato propio
+date_default_timezone_set('America/Argentina/Buenos_Aires'); // D-24: log y panel en hora local
 
 /** Una línea por error: fecha, método y path (sin query ni cuerpo: pueden traer datos personales). */
 function app_log(Throwable $e): void
@@ -71,6 +72,12 @@ set_error_handler(static function (int $level, string $message, string $file, in
     if ((error_reporting() & $level) === 0) {
         return false;
     }
+    // Una deprecación (p. ej. al actualizar PHP) se registra pero no tumba la request.
+    if ($level === E_DEPRECATED || $level === E_USER_DEPRECATED) {
+        app_log(new ErrorException($message, 0, $level, $file, $line));
+
+        return true;
+    }
     throw new ErrorException($message, 0, $level, $file, $line);
 });
 
@@ -90,18 +97,19 @@ register_shutdown_function(static function () use (&$debug, $bufferBase): void {
     app_render_500($e, $debug, $bufferBase);
 });
 
-$config = require __DIR__ . '/config/config.php';
-$debug = $config['app']['debug'];
-ini_set('display_errors', $debug ? '1' : '0');
-
-Database::configure($config['db']);
-
+// Headers antes de la config: también protegen la página 500 si la config falla.
 header_remove('X-Powered-By');
 header("Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'");
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: same-origin');
 
-Session::start((int) $config['app']['session_timeout']);
+$config = require __DIR__ . '/config/config.php';
+$debug = $config['app']['debug'];
+ini_set('display_errors', $debug ? '1' : '0');
+
+Database::configure($config['db']);
+
+Session::start((int) $config['app']['session_timeout'], $config['app']['env'] === 'production');
 
 return $config;

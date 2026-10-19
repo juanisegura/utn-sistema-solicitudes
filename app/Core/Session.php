@@ -18,8 +18,11 @@ final class Session
     /** @var array<string, string> old input de la request anterior (se consume al arrancar) */
     private static array $old = [];
 
-    /** @param int $idleTimeout segundos sin actividad tras los que la sesión se vacía (app.session_timeout) */
-    public static function start(int $idleTimeout): void
+    /**
+     * @param int  $idleTimeout segundos sin actividad tras los que la sesión se vacía (app.session_timeout)
+     * @param bool $forceSecure cookie Secure aunque no se detecte HTTPS (producción detrás de un proxy/CDN)
+     */
+    public static function start(int $idleTimeout, bool $forceSecure = false): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
             return;
@@ -31,7 +34,7 @@ final class Session
         session_set_cookie_params([
             'lifetime' => 0,
             'path'     => '/',
-            'secure'   => Request::isHttps(),
+            'secure'   => $forceSecure || Request::isHttps(),
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
@@ -92,6 +95,11 @@ final class Session
         unset($_SESSION[self::FLASH][$key]);
 
         return $value;
+    }
+
+    public static function peekFlash(string $key): mixed
+    {
+        return $_SESSION[self::FLASH][$key] ?? null;
     }
 
     /** @param array<string, string> $input valores a re-mostrar tras un redirect (nunca passwords) */

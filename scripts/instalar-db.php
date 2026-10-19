@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 // Crea (o recrea) las tablas y carga los datos de prueba usando la config de la app.
-// Uso: php scripts/instalar-db.php [--sin-datos]
-// ATENCIÓN: schema.sql borra las tablas existentes.
+// Uso: php scripts/instalar-db.php [--sin-datos] [--force]
+// ATENCIÓN: schema.sql borra las tablas existentes. Con app.env = production se niega salvo
+// --force; en producción usar --sin-datos y crear el admin con scripts/crear-admin.php
+// (el seed trae un admin con password demo publicada en el README).
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -20,6 +22,9 @@ const TABLAS = ['admins', 'solicitudes'];
 /**
  * Parte un archivo .sql en sentencias. Alcanza para nuestros archivos: comentarios de
  * línea completa con "--" y cada sentencia termina con ";" al final de una línea.
+ * Limitación conocida (B4): un ";" al final de una línea DENTRO de un string partiría la
+ * sentencia. No es inyectable (los .sql son del repo, no entrada de usuario); si un seed
+ * futuro lo necesita, escribir ese valor en una sola línea.
  *
  * @return list<string>
  */
@@ -46,12 +51,26 @@ function ejecutarArchivo(string $archivo): int
 }
 
 $args = array_slice($argv, 1);
-$desconocidos = array_diff($args, ['--sin-datos']);
+$desconocidos = array_diff($args, ['--sin-datos', '--force']);
 if ($desconocidos !== []) {
-    fwrite(STDERR, "Uso: php scripts/instalar-db.php [--sin-datos]\n");
+    fwrite(STDERR, "Uso: php scripts/instalar-db.php [--sin-datos] [--force]\n");
     exit(2);
 }
 $conDatos = !in_array('--sin-datos', $args, true);
+
+try {
+    $config = require dirname(__DIR__) . '/app/config/config.php';
+} catch (Throwable $e) {
+    fwrite(STDERR, 'Error: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+if ($config['app']['env'] === 'production' && !in_array('--force', $args, true)) {
+    fwrite(STDERR, "Abortado: app.env es 'production' y este script BORRA las tablas.\n"
+        . "En producción: php scripts/instalar-db.php --sin-datos --force y después\n"
+        . "php scripts/crear-admin.php (nunca el seed: su admin tiene password demo pública).\n");
+    exit(1);
+}
+Database::configure($config['db']);
 
 $dirDb = dirname(__DIR__) . '/database';
 

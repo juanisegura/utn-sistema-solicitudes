@@ -1,0 +1,4 @@
+# El DocumentRoot de este proyecto es SOLO public_html/ (ver README). Si por error se sirve
+# la raíz del repo, esto evita exponer .git/, database/, doc/, app/ y la config (ADR-0007).
+# public_html/.htaccess vuelve a habilitar el acceso para su propio árbol.
+Require all denied

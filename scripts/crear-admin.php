@@ -16,7 +16,7 @@ use App\Models\Admin;
 
 const PASSWORD_MIN = 12;
 // bcrypt (PASSWORD_DEFAULT) ignora lo que pasa de 72 bytes: se rechaza en vez de truncar en silencio.
-const PASSWORD_MAX_BYTES = 72;
+const PASSWORD_MAX_BYTES = Admin::MAX_PASSWORD_BYTES;
 
 function preguntar(string $texto): string
 {
@@ -26,6 +26,10 @@ function preguntar(string $texto): string
     return $linea === false ? '' : trim($linea);
 }
 
+/**
+ * Limitación conocida (B5): si se corta con Ctrl+C mientras pide la password, la terminal
+ * queda sin eco (se arregla con `stty sane`); en Windows no hay stty y la password se ve.
+ */
 function preguntarOculto(string $texto): string
 {
     $esTerminal = stream_isatty(STDIN);

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Core\Database;
+use InvalidArgumentException;
 
 final class Admin
 {
+    public const MAX_PASSWORD_BYTES = 72;
+
     /**
      * Incluye password_hash y activo: Auth decide (verifica hash y estado) para poder
      * responder igual ante email inexistente, password errónea o admin inactivo.
@@ -41,7 +44,7 @@ final class Admin
     {
         Database::execute(
             'INSERT INTO admins (nombre, email, password_hash) VALUES (?, ?, ?)',
-            [$nombre, $email, password_hash($password, PASSWORD_DEFAULT)]
+            [$nombre, $email, self::hash($password)]
         );
 
         return Database::lastInsertId();
@@ -52,12 +55,22 @@ final class Admin
     {
         Database::execute(
             'UPDATE admins SET password_hash = ? WHERE id = ?',
-            [password_hash($password, PASSWORD_DEFAULT), $id]
+            [self::hash($password), $id]
         );
     }
 
     public static function touchLastLogin(int $id): void
     {
         Database::execute('UPDATE admins SET last_login_at = NOW() WHERE id = ?', [$id]);
+    }
+
+    private static function hash(string $password): string
+    {
+        // bcrypt ignora lo que pasa de 72 bytes: se rechaza en vez de truncar en silencio.
+        if (strlen($password) > self::MAX_PASSWORD_BYTES) {
+            throw new InvalidArgumentException('La contraseña supera ' . self::MAX_PASSWORD_BYTES . ' bytes.');
+        }
+
+        return password_hash($password, PASSWORD_DEFAULT);
     }
 }

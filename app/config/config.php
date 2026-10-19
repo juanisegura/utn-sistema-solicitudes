@@ -38,6 +38,7 @@ if (!is_array($local)) {
 }
 
 $config = array_replace_recursive($defaults, $local);
-$config['app']['debug'] = (bool) $config['app']['debug'];
+// (bool) 'false' sería true: se interpreta como booleano y cualquier valor dudoso queda en false.
+$config['app']['debug'] = filter_var($config['app']['debug'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
 
 return $config;

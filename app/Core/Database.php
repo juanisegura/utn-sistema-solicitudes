@@ -90,7 +90,7 @@ final class Database
         );
 
         try {
-            return new PDO($dsn, (string) $db['user'], (string) $db['pass'], [
+            $pdo = new PDO($dsn, (string) $db['user'], (string) $db['pass'], [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
@@ -98,6 +98,10 @@ final class Database
                 // mismo estado sigue indicando que la solicitud existe.
                 self::foundRowsAttr() => true,
             ]);
+            // Modo estricto explícito: sin él, MySQL guarda '' ante un ENUM inválido o trunca en silencio.
+            $pdo->exec("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
+
+            return $pdo;
         } catch (PDOException $e) {
             // El mensaje original puede incluir host/usuario: queda en $previous para el log.
             throw new RuntimeException('No se pudo conectar a la base de datos.', 0, $e);

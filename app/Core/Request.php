@@ -21,11 +21,26 @@ final class Request
         return $path === '' ? '/' : $path;
     }
 
-    public static function input(string $key): ?string
+    /**
+     * Valor string de POST ('post') o de la query ('query'); null si falta o llegó como array
+     * (estado[]=x). Así ningún array alcanza código tipado con string (TypeError → 500).
+     */
+    public static function string(string $key, string $source = 'post'): ?string
     {
-        $value = $_POST[$key] ?? null;
+        $value = self::source($source)[$key] ?? null;
 
         return is_string($value) ? $value : null;
+    }
+
+    /** true si el parámetro vino, aunque sea vacío o array: distingue "ausente" de "inválido". */
+    public static function has(string $key, string $source = 'post'): bool
+    {
+        return array_key_exists($key, self::source($source));
+    }
+
+    public static function input(string $key): ?string
+    {
+        return self::string($key, 'post');
     }
 
     /**
@@ -44,9 +59,17 @@ final class Request
 
     public static function query(string $key): ?string
     {
-        $value = $_GET[$key] ?? null;
+        return self::string($key, 'query');
+    }
 
-        return is_string($value) ? $value : null;
+    /** @return array<string, mixed> */
+    private static function source(string $source): array
+    {
+        return match ($source) {
+            'post' => $_POST,
+            'query' => $_GET,
+            default => throw new \InvalidArgumentException('Origen de request desconocido: ' . $source),
+        };
     }
 
     /** Sin proxy delante: no se confía en X-Forwarded-Proto (lo puede mandar cualquiera). */

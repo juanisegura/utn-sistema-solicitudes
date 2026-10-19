@@ -9,7 +9,7 @@ namespace App\Core;
  * ruta nueva: método permitido (405 + Allow), autenticación y CSRF.
  *
  * Ruta: [método, patrón, [Controller::class, 'acción'], opciones]
- *   patrón: '/admin/solicitudes/{id}' — {id} solo acepta dígitos y llega a la acción como int.
+ *   patrón: '/admin/solicitudes/{id}' — {id} solo acepta enteros positivos y llega a la acción como int.
  *   opciones: 'auth' => true exige admin; 'csrf' (default true en POST) valida el token.
  */
 final class Router
@@ -65,7 +65,8 @@ final class Router
     /** @return list<int>|null parámetros {id} si el path coincide, null si no */
     private static function match(string $pattern, string $path): ?array
     {
-        $regex = '#^' . str_replace('\{id\}', '([0-9]{1,10})', preg_quote($pattern, '#')) . '$#';
+        // D: "$" no acepta un "\n" final. {id} sin ceros a la izquierda ni 0 (ids AUTO_INCREMENT empiezan en 1).
+        $regex = '#^' . str_replace('\{id\}', '([1-9][0-9]{0,9})', preg_quote($pattern, '#')) . '$#D';
         if (preg_match($regex, $path, $matches) !== 1) {
             return null;
         }

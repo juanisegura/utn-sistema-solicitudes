@@ -1,0 +1,21 @@
+🔎 utn-sistema-solicitudes: 25 archivos, 3 llamada(s) a qwen2.5-coder:7b [config=2, php=22, other=1] · working tree + untracked (equivale a git add -A)
+   1/3 [config] 2 archivo(s) · 1 hallazgo(s) · 8s
+   2/3 [other] 1 archivo(s) · 0 hallazgo(s) · 9s
+   3/3 [php] 22 archivo(s) · 1 hallazgo(s) · 16s
+Proyecto: utn-sistema-solicitudes  ·  alcance: working tree + untracked (equivale a git add -A)
+Árbol revisado: a16544ca8973dfe729467dda5fd7fc62a7bb83fc  ·  modelo: qwen2.5-coder:7b  ·  estado: reviewed
+Stacks: config=2, php=22, other=1
+Chequeos estáticos: secretos, php -l
+
+Herramientas deterministas (confiables): 0
+
+LLM con evidencia en el diff (la línea existe; el razonamiento hay que confirmarlo): 2
+  [high] .htaccess:4 (llm, evidence_found)
+      This directive denies access to the entire document root, which is not necessary and could be a security risk if not properly managed.
+      → Remove this line or ensure it is only applied where intended.
+  [high] app/Controllers/Admin/AuthController.php:28 (llm, evidence_found)
+      SQL injection vulnerability. The password is being used directly in a query without parameterized statements.
+      → Use prepared statements with PDO or mysqli to prevent SQL injection.
+
+LLM sin evidencia (probable confabulación; descartar salvo confirmación): 0
+exit=0

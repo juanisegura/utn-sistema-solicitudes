@@ -189,3 +189,41 @@ table.table { width: 100%; border-collapse: collapse; font-size: .9375rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ===== Panel admin (A1-03) ===== */
+.container-wide { max-width: 1040px; }
+.header-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.session-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.session-user { color: var(--muted); font-size: .9rem; }
+.inline-form { display: inline; margin: 0; }
+.btn-small { padding: .3rem .7rem; font-size: .875rem; }
+.filters .btn[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.card-narrow { max-width: 420px; margin-left: auto; margin-right: auto; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.nowrap { white-space: nowrap; }
+.muted { color: var(--muted); font-size: .875rem; }
+.empty { color: var(--muted); padding: 1rem 0; }
+.alert-success { background: var(--success-bg); color: var(--success); border-left: 4px solid var(--success); padding: .75rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+.alert p { margin: 0; }
+.detail-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 1rem; }
+.detail-header h1 { margin: 0; }
+.detail { display: grid; grid-template-columns: max-content 1fr; gap: .5rem 1rem; margin: 0 0 1.5rem; }
+.detail dt { font-weight: 600; color: var(--muted); }
+.detail dd { margin: 0; overflow-wrap: anywhere; }
+.prewrap { white-space: pre-wrap; }
+select { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .6rem; }
+.form-inline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; border-top: 1px solid var(--border); padding-top: 1rem; }
+.form-inline .field, .form-inline .form-actions { margin: 0; }
+.table td a { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .detail { grid-template-columns: 1fr; }
+  .detail dd { margin-bottom: .5rem; }
+}
+/* Tabla del panel en celulares: cada fila pasa a ser una tarjeta con etiquetas (data-label). */
+@media (max-width: 600px) {
+  .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table tr { padding: .6rem .75rem; border-bottom: 1px solid var(--border); }
+  .table td { padding: .2rem 0; border: 0; }
+  .table td::before { content: attr(data-label); display: block; font-size: .75rem; font-weight: 600; color: var(--muted); }
+}

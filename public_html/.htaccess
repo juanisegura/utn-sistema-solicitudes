@@ -1,4 +1,7 @@
 # Apache: todo lo que no sea un archivo real va al front controller.
+# Anula el "Require all denied" del .htaccess de la raíz del repo, que Apache también aplica
+# acá (hereda los .htaccess de los directorios padres) aunque el DocumentRoot sea este.
+Require all granted
 Options -Indexes
 DirectoryIndex index.php
 

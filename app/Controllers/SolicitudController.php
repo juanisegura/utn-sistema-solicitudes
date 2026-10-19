@@ -18,7 +18,7 @@ final class SolicitudController
         'nombre'      => ['required', 'max:100'],
         'email'       => ['required', 'email', 'max:254'],
         'asunto'      => ['required', 'max:150'],
-        'descripcion' => ['required', 'max:5000'],
+        'descripcion' => ['required', 'max:5000', 'multiline'],
     ];
 
     private const LABELS = [
@@ -52,7 +52,8 @@ final class SolicitudController
 
     public function gracias(): void
     {
-        $id = Session::pullFlash(self::FLASH_ID);
+        // HEAD (prefetch, chequeos de links) no debe gastar la confirmación antes de que la vea el usuario.
+        $id = Request::method() === 'HEAD' ? Session::peekFlash(self::FLASH_ID) : Session::pullFlash(self::FLASH_ID);
         if (!is_int($id)) {
             Response::redirect('/');
         }
