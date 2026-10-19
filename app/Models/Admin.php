@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Core\Database;
 use InvalidArgumentException;
+use Throwable;
 
 final class Admin
 {
@@ -64,6 +65,29 @@ final class Admin
     }
 
     /**
+     * Credenciales para el login (D-65): como findByEmail, más el instante en que se leyó el hash,
+     * que la sesión guarda como auth_at.
+     *
+     * LOCK IN SHARE MODE (lectura bloqueante, no la instantánea de InnoDB): si cambiarPassword()
+     * tiene la fila tomada, espera a que confirme y lee el hash nuevo. SYSDATE(6) se evalúa al
+     * producir la fila, después de esa espera; NOW(6) daría el inicio de la sentencia, antes de
+     * esperar. Así, si se leyó el hash viejo, la lectura terminó antes de que el cambio tomara la
+     * fila y leido_en < password_changed_at: la sesión queda invalidada.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function paraLogin(string $email): ?array
+    {
+        $email = self::normalizeEmail($email);
+
+        return Database::fetchOne(
+            'SELECT id, password_hash, activo, SYSDATE(6) AS leido_en FROM admins
+             WHERE email = ? AND email COLLATE utf8mb4_bin = ? LOCK IN SHARE MODE',
+            [$email, $email]
+        );
+    }
+
+    /**
      * Para re-verificar en cada request admin que la cuenta siga existiendo y activa, y que la
      * sesión sea posterior al último cambio de contraseña (F-5). No devuelve el hash.
      *
@@ -89,16 +113,33 @@ final class Admin
      * Cambio de contraseña pedido por el admin (F-5): nuevo hash y password_changed_at = NOW(6).
      * Devuelve ese instante (con microsegundos, reloj de la DB): las sesiones con auth_at anterior
      * quedan invalidadas. El rehash automático del login usa updatePasswordHash(), que no invalida.
+     *
+     * D-65: primero se toma la fila (FOR UPDATE), que espera a los logins que estén leyendo el hash
+     * (paraLogin); recién después empieza el UPDATE y su NOW(6). Todo login que leyó el hash viejo
+     * terminó antes, así que su auth_at queda anterior al cambio. El bcrypt va antes de abrir la
+     * transacción para no retener la fila ~250 ms.
      */
     public static function cambiarPassword(int $id, #[\SensitiveParameter] string $password): string
     {
-        $ahora = self::ahora();
-        Database::execute(
-            'UPDATE admins SET password_hash = ?, password_changed_at = ? WHERE id = ?',
-            [self::hash($password), $ahora, $id]
-        );
+        $hash = self::hash($password);
+        $pdo = Database::pdo();
+        $pdo->beginTransaction();
+        try {
+            Database::fetchOne('SELECT id FROM admins WHERE id = ? FOR UPDATE', [$id]);
+            Database::execute(
+                'UPDATE admins SET password_hash = ?, password_changed_at = NOW(6) WHERE id = ?',
+                [$hash, $id]
+            );
+            $cambio = (string) Database::fetchOne('SELECT password_changed_at FROM admins WHERE id = ?', [$id])['password_changed_at'];
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
 
-        return $ahora;
+        return $cambio;
     }
 
     /** Hashea acá para que ningún llamador pueda guardar la password en claro por error. */
@@ -112,32 +153,23 @@ final class Admin
         return Database::lastInsertId();
     }
 
-    /** Usado al loguear cuando needsRehash() indica un algoritmo/costo distinto del fijado. */
-    public static function updatePasswordHash(int $id, #[\SensitiveParameter] string $password): void
+    /**
+     * Usado al loguear cuando needsRehash() indica un algoritmo/costo distinto del fijado. Solo
+     * reemplaza el hash que se verificó ($hashLeido): si entretanto se cambió la contraseña, no la
+     * pisa con la vieja (D-65).
+     */
+    public static function updatePasswordHash(int $id, #[\SensitiveParameter] string $password, string $hashLeido): void
     {
         Database::execute(
-            'UPDATE admins SET password_hash = ? WHERE id = ?',
-            [self::hash($password), $id]
+            'UPDATE admins SET password_hash = ? WHERE id = ? AND password_hash = ?',
+            [self::hash($password), $id, $hashLeido]
         );
     }
 
-    /**
-     * Registra el login y devuelve su instante (NOW(6), reloj de la DB), que la sesión guarda como
-     * auth_at para compararlo con password_changed_at sin mezclar relojes ni perder el orden
-     * dentro del mismo segundo (F-5).
-     */
-    public static function touchLastLogin(int $id): string
+    /** Registra el login (last_login_at). El auth_at de la sesión es el de paraLogin(), no este (D-65). */
+    public static function touchLastLogin(int $id): void
     {
-        $ahora = self::ahora();
-        Database::execute('UPDATE admins SET last_login_at = ? WHERE id = ?', [substr($ahora, 0, 19), $id]);
-
-        return $ahora;
-    }
-
-    /** "AAAA-MM-DD HH:MM:SS.uuuuuu" de la DB: mismo formato que password_changed_at (comparable como texto). */
-    private static function ahora(): string
-    {
-        return (string) Database::fetchOne('SELECT NOW(6) AS ahora')['ahora'];
+        Database::execute('UPDATE admins SET last_login_at = NOW() WHERE id = ?', [$id]);
     }
 
     private static function hash(#[\SensitiveParameter] string $password): string

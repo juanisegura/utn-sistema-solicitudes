@@ -35,7 +35,7 @@ final class Auth
             return false;
         }
 
-        $admin = Admin::findByEmail($email); // normaliza y compara en binario (D-41)
+        $admin = Admin::paraLogin($email); // normaliza y compara en binario (D-41); trae leido_en (D-65)
         $hash = $admin['password_hash'] ?? self::DUMMY_HASH;
         $valid = password_verify($password, $hash);
         if (!$valid || $admin === null || (int) $admin['activo'] !== 1) {
@@ -43,11 +43,15 @@ final class Auth
         }
 
         $id = (int) $admin['id'];
+        // D-65: auth_at es el instante en que se leyó el hash que se acaba de verificar, no el de
+        // ahora. Un cambio de contraseña que se confirme durante el bcrypt queda posterior a auth_at
+        // e invalida esta sesión en la próxima request (Auth::user).
+        $authAt = (string) $admin['leido_en'];
         // Efectos en la DB antes de fijar la sesión (D-53): si alguno falla, la request termina en
         // 500 sin dejar una sesión autenticada a medias.
-        $authAt = Admin::touchLastLogin($id);
+        Admin::touchLastLogin($id);
         if (Admin::needsRehash($hash)) {
-            Admin::updatePasswordHash($id, $password);
+            Admin::updatePasswordHash($id, $password, $hash);
         }
         // Nuevo ID de sesión y nuevo token CSRF: lo que se haya obtenido como invitado deja de servir.
         // El admin_id se escribe último: es lo que vuelve autenticada a la sesión.

@@ -34,7 +34,11 @@ final class SolicitudController
     private const FLASH_ID = 'solicitud_creada';
     /** Código de seguimiento (F-3): vive en la sesión solo entre el 302 y el GET de /gracias. */
     private const FLASH_CODIGO = 'solicitud_codigo';
-    /** Confirmación sin número para el honeypot (F-1): el bot no puede distinguirla de un alta real. */
+    /**
+     * Confirmación genérica del honeypot (F-1): la respuesta del POST es idéntica a la de un alta
+     * real (302 a /gracias), pero esa página no muestra número ni código. Un bot que la lea puede
+     * notarlo; es una trampa barata contra bots simples, asumida así (D-65).
+     */
     private const FLASH_GENERICA = 'solicitud_generica';
     private const HONEYPOT = 'sitio_web';
 
