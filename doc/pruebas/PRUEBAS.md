@@ -38,6 +38,21 @@ Las columnas "Resultado obtenido" y "Evidencia" se completan al ejecutar contra 
 | Password con NUL (H.16) | H.16 | password correcta + %00 + sufijo en el login → 401 y /admin sigue en 302 (bcrypt ignora lo que sigue al NUL) | | |
 | Parámetros como array (H.12, H.13, P6.8) | H.12, H.13, P6.8 | nombre[] en el formulario público 422 (H.12); ?estado[] 400 (H.13); estado[] en el cambio de estado 422 (P6.8); sin fugas de error ni 500 | | |
 
+## Tests automatizados (unitarios, integración, CI)
+
+Además del smoke HTTP hay tests unitarios (`php tests/unit/run.php`, sin DB ni red) e integración (`php tests/integration/run.php`, contra la DB y la app), con un runner propio sin dependencias (D-48). El detalle por archivo está en `tests/README.md`, sección "Tests unitarios, integración y CI". El CI de GitHub Actions corre sintaxis, unitarios, integración y smoke con PHP 8.2 y 8.5 sobre MySQL 8.0.
+
+| Mejora | Cubierta por | Resultado esperado |
+|---|---|---|
+| M-1 IP con proxies de confianza | `unit/RequestIpTest.php` (24 casos) | XFF solo desde proxies configurados, de derecha a izquierda; huecos (a)–(d) de D-49 |
+| M-1 límite exacto bajo concurrencia | `integration/LoginAtomicidadTest.php` | 4 fallos + 8 simultáneos → como mucho un 401; filas ≤ 5 |
+| M-2 historial en transacción | `integration/HistorialTransaccionTest.php` | eventos encadenados también con cambios simultáneos; no-op sin evento; FKs |
+| M-3 escape de LIKE | `unit/LikeEscapeTest.php` | `%`, `_` y `\` escapados |
+| M-5 sesión solo con ruta resuelta | `unit/RouterTest.php` (casos M-5) | 404/405 sin sesión; la acción corre con sesión activa |
+| M-6 rotación de logs | `unit/LogTest.php` | rotación por tamaño, tope de archivos, sin pérdidas con dos procesos |
+| M-8 timeout de sesión | `unit/SessionTimeoutTest.php` | antes de vencer conserva datos e ID; después se vacía y cambia el ID |
+| Validator, Estado, Router, Csrf, redirect, Admin | `unit/*Test.php` | regresiones de A2-02..A2-06 |
+
 ## Pruebas manuales (navegador)
 
 El script no cubre los siguientes puntos:
@@ -46,7 +61,7 @@ El script no cubre los siguientes puntos:
 - [ ] Revisión visual del panel admin (listado, filtros, detalle).
 - [ ] Revisión visual de las páginas de error (404, 405, 419) y de /gracias.
 - [ ] Mensajes de error junto a cada campo inválido.
-- [ ] Timeout de sesión por inactividad (D-21): procedimiento en `tests/README.md`, sección "Prueba manual del timeout de sesión (D-21)", bajando `app.session_timeout` en la config local.
+- [x] Timeout de sesión por inactividad (D-21): automatizado en `tests/unit/SessionTimeoutTest.php` (M-8). Opcional de punta a punta por HTTP: procedimiento en `tests/README.md`, sección "Prueba manual del timeout de sesión (D-21)", bajando `app.session_timeout` en la config local.
 
 Verificado a mano en A2-04 (curl + snippets PHP que cargan la app; no automatizable sin acceso a la DB/sesiones desde el smoke):
 
@@ -71,3 +86,4 @@ Comportamiento con JavaScript deshabilitado: no aplica, la aplicación no usa JS
 | 2026-10-19 13:45 | Fase 1 + formulario público; panel admin sin implementar (A1-03 pendiente) | 64 casos: 19 PASS, 12 FAIL, 33 SKIP. Público (P1.1–P1.4, P2.1–P2.3, P7.1, P7.5, H.3–H.5, H.10–H.12, S.1–S.3, S.5) en PASS; todo /admin responde 404 (rutas aún no existen), el resto SKIP por falta de login | sin archivo (corrida exploratoria) |
 | 2026-10-19 14:20 | Commit 7bb711d (auth + panel), DB recién reinstalada (A2-04) | 68 casos: 67 PASS, 1 FAIL (H.16, hallazgo nuevo de A2-04: login acepta password + NUL + sufijo), 0 SKIP | sin archivo (corrida de revisión) |
 | 2026-10-19 16:50 | c710de5 + A1-06 sin commitear (límite de login), DB recién reinstalada (A2-05) | 72 casos: 72 PASS, 0 FAIL, 0 SKIP | sin archivo (corrida de revisión) |
+| 2026-10-19 18:40 | A1-09 en el árbol sin commitear (M-1, M-5, M-6) + `escapeLike` de A1-10 (A2-07) | Unitarios: 99 tests, 99 PASS. Los mismos tests contra `HEAD` sin A1-09: 56 PASS, 39 FAIL (todos los de M-1, M-5, M-6 y M-8), 4 PENDIENTE. Integración y smoke: no ejecutados (sin turno de DB, D-42) | sin archivo |

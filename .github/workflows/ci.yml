@@ -1,0 +1,128 @@
+# CI (M-7, D-48): sintaxis, tests unitarios, DB MySQL 8.0, integración y smoke HTTP.
+# Matriz: PHP 8.2 (mínimo soportado, valida D-35) y la última estable. MySQL 8.0 valida la
+# compatibilidad que localmente solo se prueba con MariaDB. Las credenciales de la DB son las
+# del contenedor efímero de este job: no son secretos y no sirven fuera del runner.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: PHP ${{ matrix.php }} + MySQL 8.0
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.5']
+
+    env:
+      DB_NAME: utn_solicitudes
+      DB_USER: utn_ci
+      DB_PASS: ci-efimera-no-secreta
+      BASE_URL: http://127.0.0.1:8080
+      SIN_SKIP: '1'   # en CI un SKIP (falta DB/servidor) es una falla del entorno
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root-ci-efimera
+          MYSQL_DATABASE: utn_solicitudes
+          MYSQL_USER: utn_ci
+          MYSQL_PASSWORD: ci-efimera-no-secreta
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot-ci-efimera"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_mysql, mbstring, curl
+          coverage: none
+          ini-values: error_reporting=E_ALL, display_errors=On
+
+      - name: Versiones
+        run: |
+          php -v
+          php -m | grep -Ei '^(pdo_mysql|mbstring|curl)$'
+
+      - name: Sintaxis (php -l de todo el árbol)
+        run: find app public_html scripts tests -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Tests unitarios
+        run: php tests/unit/run.php
+
+      - name: Config local efímera (sin secretos)
+        run: |
+          cat > app/config/config.local.php <<'PHP'
+          <?php
+          return [
+              'app' => [
+                  'env'      => 'local',
+                  'debug'    => false,
+                  'base_url' => getenv('BASE_URL') ?: 'http://127.0.0.1:8080',
+              ],
+              'db' => [
+                  'host'    => '127.0.0.1',
+                  'port'    => 3306,
+                  'name'    => getenv('DB_NAME'),
+                  'user'    => getenv('DB_USER'),
+                  'pass'    => getenv('DB_PASS'),
+                  'charset' => 'utf8mb4',
+              ],
+          ];
+          PHP
+          php -l app/config/config.local.php
+
+      - name: Instalar DB (schema + seed)
+        run: php scripts/instalar-db.php
+
+      - name: Levantar la app (php -S con workers para concurrencia real)
+        run: |
+          mkdir -p storage/logs
+          PHP_CLI_SERVER_WORKERS=8 nohup php -S 127.0.0.1:8080 -t public_html public_html/index.php \
+            > storage/logs/php-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fs -o /dev/null "$BASE_URL/"; then echo "servidor listo ($i)"; exit 0; fi
+            sleep 1
+          done
+          echo "el servidor no respondió en 30 s"; cat storage/logs/php-server.log; exit 1
+
+      - name: Tests de integración
+        run: php tests/integration/run.php
+
+      - name: Reinstalar DB (el smoke exige DB recién instalada, D-38)
+        run: php scripts/instalar-db.php
+
+      - name: Smoke HTTP
+        run: bash tests/smoke.sh --base-url "$BASE_URL" --evidencia
+
+      - name: Evidencia y logs si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias-php-${{ matrix.php }}
+          path: |
+            doc/pruebas/evidencias/
+            storage/logs/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,4 +1,8 @@
-# Tests smoke (`tests/smoke.sh`)
+# Tests (`tests/`)
+
+Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). El CI (`.github/workflows/ci.yml`) corre las tres. Ver la sección "Tests unitarios, integración y CI" al final.
+
+# Smoke HTTP (`tests/smoke.sh`)
 
 ## Qué es
 
@@ -182,7 +186,9 @@ Al terminar, reinstalar la DB.
 
 ## Prueba manual del timeout de sesión (D-21)
 
-El timeout de inactividad no se automatiza: el default es 1800 s. Procedimiento:
+El timeout de inactividad no se automatiza: el default es 1800 s. Desde M-8 está automatizado en `tests/unit/SessionTimeoutTest.php` (ver abajo); este procedimiento queda para verificarlo de punta a punta por HTTP.
+
+Procedimiento:
 
 1. En la config local (`app/config/config.local.php`, clave `app.session_timeout`) bajar el valor a, por ejemplo, `60`.
 2. Reiniciar el servidor si hace falta.
@@ -199,3 +205,33 @@ guarda en `/tmp/sess_<id>` (save_path por defecto). Tras loguearse, reescribir `
 de ese archivo a `ahora - 1801` (y `ahora - 1700` como control): `GET /admin` → 302 a
 `/admin/login` con ID nuevo y el archivo viejo borrado; un `POST` de estado con el token previo
 → 401 sin cambio. Con el control (1700 s) → 200.
+
+## Tests unitarios, integración y CI (M-7, M-8, D-48)
+
+Runner propio sin dependencias (`tests/lib/runner.php`, sin Composer por ADR-0001). Descubre los `*Test.php` del directorio; cada caso es `test('nombre', fn () => …)` con aserciones mínimas (`assertSame`, `assertTrue`, `assertFalse`, `assertNull`, `assertNotSame`, `assertContains`, `assertThrows`). Salida por caso: `PASS`, `FAIL` (con el mensaje), `PEND` (la unidad del contrato todavía no existe: se implementa en una tarea posterior) o `SKIP` (falta DB o servidor). Exit code 0 sin FAIL, 1 con alguno, 2 si no hay tests. Con `SIN_SKIP=1` (así corre el CI) un SKIP cuenta como FAIL.
+
+```bash
+php tests/unit/run.php                 # todos los unitarios
+php tests/unit/run.php Router          # filtro por archivo o nombre de caso
+BASE_URL=http://localhost:8080 php tests/integration/run.php
+```
+
+- **Unitarios**: no necesitan config ni DB (no cargan `config.local.php`; lo que una unidad necesita se le pasa armado). Lo que termina con `exit` (`Response::redirect`/`abort`, `Router::dispatch`) o abre una sesión corre en un **proceso PHP hijo** (`tests/lib/child.php`), que informa el código HTTP, el estado de la sesión y lo que el test devuelva. `Router::match`/`allowHeader` (privados y puros) se prueban por Reflection. El header `Allow` no es observable en CLI (`headers_list()` vacío): se verifica su composición en `allowHeader` y el 405 en el dispatch.
+- **Integración**: usan la DB de la app a través de `App\Core\Database` (el test no lee ni imprime credenciales) y HTTP contra `BASE_URL` con ext-curl. Requieren **turno exclusivo** de DB y servidor (D-42). Limpian sus filas: no gastan el presupuesto por IP del smoke. Para que la ráfaga de M-1 pruebe la carrera de verdad, el servidor tiene que atender en paralelo: `PHP_CLI_SERVER_WORKERS=8 php -S …` (con un solo worker el caso pasa pero solo verifica el conteo).
+
+| Archivo | Unidad | Qué verifica |
+|---|---|---|
+| `unit/ValidatorTest.php` | `Validator` | UTF-8 inválido, recorte Unicode (NBSP, ZWSP, BOM, U+3000), controles, CR/LF en una línea, multiline, `max` en caracteres, email, regla desconocida |
+| `unit/EstadoTest.php` | `Estado` | `fromInput` (válidos, null/vacío, trim, fuera de lista), coincidencia con el ENUM de `schema.sql` |
+| `unit/RouterTest.php` | `Router` | `{id}` con `$D` y `[1-9][0-9]{0,9}`, escape del patrón, `Allow` + HEAD; dispatch 404/405/HEAD/`{id}` int; **M-5**: 404/405 sin sesión, acción con sesión activa |
+| `unit/CsrfTest.php` | `Csrf` | `verify` con null, vacío, otro token, prefijo/sufijo, guardado no-string, array (TypeError); `rotate`; formato de `token()` |
+| `unit/ResponseTest.php` | `Response::redirect` | 15 destinos rechazados (esquema, `//`, `/\`, CR/LF, NUL, TAB, DEL); local → 302 y termina |
+| `unit/AdminTest.php` | `Admin` | `normalizeEmail` (multibyte, idempotente, sin quitar acentos — D-41), `passwordAcceptable` (72 bytes, NUL), bcrypt costo 12 fijo y hash ficticio igual (D-35, D-37) |
+| `unit/RequestIpTest.php` | `Request::ip` (M-1) | sin proxies, proxy confiable, XFF falsificado, derecha a izquierda, cadena, CIDR v4/v6, huecos (a)–(d) de D-49 |
+| `unit/LogTest.php` | `Log` (M-6) | "supera" estricto, rotación antes de escribir, corrimiento y descarte, tope de archivos, 2 procesos concurrentes sin líneas perdidas/mezcladas |
+| `unit/SessionTimeoutTest.php` | `Session` (**M-8**) | antes/después de vencer (manipulando `_last_activity`), ID nuevo y sesión vieja borrada, ventana deslizante, tiempo real 1 s, `gc_maxlifetime ≥ timeout` |
+| `unit/LikeEscapeTest.php` | escape de LIKE (M-3) | `%`, `_`, `\` (la barra primero), multibyte; PENDIENTE si la función no existe |
+| `integration/LoginAtomicidadTest.php` | límite (M-1, D-46) | 4 fallos + ráfaga de 8 simultáneos → ≤ 1 verificado (401) y filas = previas + verificados ≤ 5; CSRF inválido no reserva; éxito no deja fila |
+| `integration/HistorialTransaccionTest.php` | historial (M-2) | alta sin evento, evento con anterior/nuevo/admin, no-op sin evento, 422/404 sin evento, cambios simultáneos encadenados, FK CASCADE/RESTRICT, vista; PENDIENTE sin la tabla |
+
+**CI** (`.github/workflows/ci.yml`, en push y pull request a `main`): matriz PHP 8.2 y 8.5 con MySQL 8.0 como servicio (healthcheck). Pasos: `php -l` de todo el árbol → unitarios (todavía sin config) → `config.local.php` generado con las credenciales del contenedor efímero (no son secretos; `env=local`, `debug=false`) → `instalar-db` → `php -S` con 8 workers y espera activa → integración → `instalar-db` otra vez (el smoke exige DB recién instalada) → `smoke.sh --evidencia`. Si algo falla, sube `doc/pruebas/evidencias/` y `storage/logs/` como artifact.
