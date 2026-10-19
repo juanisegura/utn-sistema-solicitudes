@@ -1,0 +1,15 @@
+# Configuración local con credenciales (ver app/config/config.local.example.php)
+app/config/config.local.php
+.env
+
+# Logs y temporales
+storage/logs/*
+!storage/logs/.gitkeep
+*.log
+*.cookies
+tests/.tmp/
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
