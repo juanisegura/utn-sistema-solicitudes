@@ -28,6 +28,15 @@ final class Admin
         return strlen($password) <= self::MAX_PASSWORD_BYTES && !str_contains($password, "\0");
     }
 
+    /**
+     * Forma canónica del email (D-41): la usan el alta, la búsqueda del login y el hash del
+     * límite de intentos, así una misma cuenta tiene un único contador.
+     */
+    public static function normalizeEmail(string $email): string
+    {
+        return mb_strtolower(trim($email), 'UTF-8');
+    }
+
     public static function needsRehash(string $hash): bool
     {
         return password_needs_rehash($hash, self::HASH_ALGO, self::HASH_OPTIONS);
@@ -37,13 +46,20 @@ final class Admin
      * Incluye password_hash y activo: Auth decide (verifica hash y estado) para poder
      * responder igual ante email inexistente, password errónea o admin inactivo.
      *
+     * Comparación binaria contra el email normalizado (D-41): con la collation _ci de la
+     * columna, "ádmin@…" encontraría a "admin@…" con otro contador de intentos (bypass del
+     * límite). La primera condición usa el índice UNIQUE (_ci); la segunda exige igualdad exacta.
+     *
      * @return array<string, mixed>|null
      */
     public static function findByEmail(string $email): ?array
     {
+        $email = self::normalizeEmail($email);
+
         return Database::fetchOne(
-            'SELECT id, nombre, email, password_hash, activo FROM admins WHERE email = ?',
-            [$email]
+            'SELECT id, nombre, email, password_hash, activo FROM admins
+             WHERE email = ? AND email COLLATE utf8mb4_bin = ?',
+            [$email, $email]
         );
     }
 
@@ -66,7 +82,7 @@ final class Admin
     {
         Database::execute(
             'INSERT INTO admins (nombre, email, password_hash) VALUES (?, ?, ?)',
-            [$nombre, $email, self::hash($password)]
+            [$nombre, self::normalizeEmail($email), self::hash($password)]
         );
 
         return Database::lastInsertId();

@@ -33,7 +33,7 @@ final class Auth
             return false;
         }
 
-        $admin = Admin::findByEmail(trim($email));
+        $admin = Admin::findByEmail($email); // normaliza y compara en binario (D-41)
         $hash = $admin['password_hash'] ?? self::DUMMY_HASH;
         $valid = password_verify($password, $hash);
         if (!$valid || $admin === null || (int) $admin['activo'] !== 1) {

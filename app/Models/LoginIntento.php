@@ -14,10 +14,10 @@ final class LoginIntento
 {
     private const RETENCION_SEG = 86400;
 
-    /** El email nunca se guarda en claro: solo su SHA-256 normalizado. */
+    /** El email nunca se guarda en claro: solo el SHA-256 de su forma canónica (Admin::normalizeEmail). */
     public static function emailHash(string $email): string
     {
-        return hash('sha256', mb_strtolower(trim($email), 'UTF-8'));
+        return hash('sha256', Admin::normalizeEmail($email));
     }
 
     public static function registrarFallo(string $ip, string $emailHash): void

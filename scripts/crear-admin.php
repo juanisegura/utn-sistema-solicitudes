@@ -61,7 +61,7 @@ if ($nombre === '' || mb_strlen($nombre) > 100) {
     fallar('el nombre es obligatorio (máx. 100 caracteres).');
 }
 
-$email = mb_strtolower(preguntar('Email: '));
+$email = Admin::normalizeEmail(preguntar('Email: '));
 if (strlen($email) > 254 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
     fallar('email inválido.');
 }
@@ -85,6 +85,13 @@ try {
         fallar('ya existe un administrador con ese email.');
     }
     $id = Admin::create($nombre, $email, $password);
+} catch (PDOException $e) {
+    // El UNIQUE (_ci) rechaza también emails que difieren solo en mayúsculas o acentos.
+    if ($e->getCode() === '23000') {
+        fallar('ya existe un administrador con un email equivalente (difiere solo en mayúsculas o acentos).');
+    }
+    fwrite(STDERR, 'Error: ' . $e->getMessage() . "\n");
+    exit(1);
 } catch (Throwable $e) {
     fwrite(STDERR, 'Error: ' . $e->getMessage() . "\n");
     exit(1);

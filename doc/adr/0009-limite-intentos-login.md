@@ -68,9 +68,17 @@ debe permitir enumerar cuentas ni convertirse en una forma fácil de dejar al ad
 - **Proxy o CDN delante:** `REMOTE_ADDR` sería la IP del proxy y todos compartirían el
   límite. Habría que tomar la IP de `X-Forwarded-For` solo cuando la conexión viene de un
   proxy de confianza.
-- **Variantes del email:** la búsqueda en `admins` usa collation `_ci` (ignora mayúsculas y
-  acentos), pero el hash del límite solo normaliza mayúsculas y espacios. Un atacante que
-  varíe acentos (`admín@…`) evita el límite por cuenta, pero sigue sujeto al de 20 por IP.
+- **Variantes del email (corregido, D-41):** el email se normaliza en un solo lugar
+  (`Admin::normalizeEmail` = `mb_strtolower(trim())`), que usan el alta, la búsqueda del
+  login y el hash del contador. La búsqueda del admin compara en forma **binaria**
+  (`email = ? AND email COLLATE utf8mb4_bin = ?`): la primera condición aprovecha el índice
+  único y la segunda exige igualdad exacta. Variantes de mayúsculas y espacios
+  (`ADMIN@EXAMPLE.COM`, ` admin@example.com `) son la misma cuenta y comparten contador.
+  Variantes que la collation `_ci` consideraría equivalentes (`ádmin@…`, `ÁDMIN@…`) no
+  autentican nunca: antes era un bypass real del límite por cuenta (hallazgo de A2-05),
+  porque encontraban al admin con un contador distinto. La columna conserva
+  `utf8mb4_unicode_ci` para que el `UNIQUE` siga rechazando cuentas que difieran solo en
+  mayúsculas o acentos.
 - **Pruebas:** cada corrida del smoke registra fallos desde la misma IP, así que hay que
   reinstalar la base (o vaciar `login_intentos`) entre corridas.
 - Agrega una tabla y dos o tres consultas por intento de login; no afecta el resto de la
