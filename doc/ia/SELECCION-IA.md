@@ -2,7 +2,7 @@
 
 Entregable de la consigna §5. El registro completo y literal de **todos** los prompts y
 respuestas está en [`registro/`](registro/). La bitácora por tarea está en
-[`PROMPTS.md`](PROMPTS.md), las decisiones numeradas (D-01…D-53) en
+[`PROMPTS.md`](PROMPTS.md), las decisiones numeradas (D-01…D-62) en
 [`DECISIONES.md`](DECISIONES.md) y el triage de las revisiones automáticas en
 [`revisiones/`](revisiones/).
 
@@ -15,6 +15,7 @@ respuestas está en [`registro/`](registro/). La bitácora por tarea está en
 | Claude Code, AGENTE 2 UTN | Revisor/QA. Escribió las pruebas antes que el código, en cada fase, y revisó adversarialmente. Usó un subagente Sonnet como segunda opinión |
 | Cerebro MCP (base de conocimiento propia) | Patrones ya validados en otros proyectos: capa PDO, sesiones, CSRF, front controller, diseño frontend |
 | Ollama local (`qwen2.5-coder:7b`) vía `local-review.sh` | Revisión automática antes de los push; sus hallazgos se triagean a mano |
+| GitHub Copilot CLI 1.0.91 | Auditoría final independiente (seguridad, calidad, cumplimiento de la consigna) sobre un export limpio y en solo lectura, junto con dos subagentes Claude como segunda opinión; triage en [`../auditoria/AUDITORIA-FINAL.md`](../auditoria/AUDITORIA-FINAL.md) |
 | `php -l`, `curl`, `tests/run-all.sh`, Chrome y Firefox headless, Apache local | Verificación |
 
 **Método** ([ADR-0002](../adr/0002-metodo-ia-orquestador-agentes.md), modo de orquestación
@@ -88,7 +89,7 @@ simultáneos; el nuevo deja exactamente 1, también con 30.
 
 - **Nunca acepté un "PASS" informado sin repetirlo.** Corrí la suite completa por mi cuenta
   sobre una DB reinstalada en cada entrega. La corrida oficial final con `run-all.sh` dio
-  unit 101, integración 11 y smoke 84, todos OK.
+  unit 137, integración 27 y smoke 84, todos OK.
 - **Reproduje los hallazgos antes de aceptarlos.** Por ejemplo:
   - M1: `.git/config` respondía 200 en Apache; después del fix, 403.
   - El login con `password%00xyz` entraba.
