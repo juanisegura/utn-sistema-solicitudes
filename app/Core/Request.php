@@ -57,11 +57,6 @@ final class Request
         return $data;
     }
 
-    public static function query(string $key): ?string
-    {
-        return self::string($key, 'query');
-    }
-
     /** @return array<string, mixed> */
     private static function source(string $source): array
     {

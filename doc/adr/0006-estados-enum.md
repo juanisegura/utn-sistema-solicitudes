@@ -16,8 +16,8 @@ podría terminar en el SQL o persistir un estado inexistente.
 - En la DB: `estado ENUM('pendiente','en_proceso','resuelta') NOT NULL DEFAULT 'pendiente'`.
 - En PHP: `enum App\Models\Estado: string` con los mismos valores, `label()` para la
   presentación y `fromInput(?string): ?self` (trim + `tryFrom`).
-- Los modelos solo aceptan `Estado` (no strings) en `Solicitud::all(?Estado)` y
-  `updateEstado(int, Estado)`. La entrada inválida se corta en el controller:
+- Los modelos solo aceptan `Estado` (no strings) en `Solicitud::buscar(?Estado, …)`,
+  `contar(?Estado, …)` y `updateEstado(int, Estado, int)`. La entrada inválida se corta en el controller:
   `fromInput` devuelve null → 422. El valor llega al SQL solo como parámetro preparado
   (`$estado->value`).
 

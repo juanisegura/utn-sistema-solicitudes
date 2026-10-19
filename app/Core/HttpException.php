@@ -32,17 +32,6 @@ final class HttpException extends RuntimeException
         parent::__construct('HTTP ' . $status, $status); // getCode() también devuelve el status
     }
 
-    public function getStatus(): int
-    {
-        return $this->status;
-    }
-
-    /** @return array<string, string> */
-    public function getHeaders(): array
-    {
-        return $this->headers;
-    }
-
     public function isRedirect(): bool
     {
         return self::location($this->headers) !== null;

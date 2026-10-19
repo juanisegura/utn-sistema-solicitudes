@@ -70,8 +70,11 @@ final class AuthController
         Response::redirect('/admin/login');
     }
 
-    /** Re-muestra el email (escapado en la vista); la password nunca vuelve al HTML. */
-    /** @param array<string, string> $headers */
+    /**
+     * Re-muestra el email (escapado en la vista); la password nunca vuelve al HTML.
+     *
+     * @param array<string, string> $headers p. ej. ['Retry-After' => '840'] para el 429
+     */
     private function renderLogin(string $email, ?string $error, int $status, array $headers = []): void
     {
         Response::html(View::render('admin/login', [

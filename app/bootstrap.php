@@ -113,16 +113,17 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: same-origin');
 
-$config = require __DIR__ . '/config/config.php';
-Config::configure($config);
-$debug = $config['app']['debug'];
+// Config valida todo y falla al arrancar si algo es inválido (AU-3): el handler loguea y responde
+// la 500 genérica (debug sigue en false hasta acá).
+Config::configure(require __DIR__ . '/config/config.php');
+$debug = Config::get('app.debug'); // false en producción siempre (AU-1)
 ini_set('display_errors', $debug ? '1' : '0');
 
 Database::configure(Config::get('db'));
 
-Log::configure(APP_LOG, (int) $config['app']['log_max_bytes'], (int) $config['app']['log_max_archivos']);
-Request::configure($config['app']);
-LoginThrottle::configure($config['app']);
-Session::configure((int) $config['app']['session_timeout'], $config['app']['env'] === 'production');
+Log::configure(APP_LOG, Config::get('app.log_max_bytes'), Config::get('app.log_max_archivos'));
+Request::configure(Config::get('app'));
+LoginThrottle::configure(Config::get('app'));
+Session::configure(Config::get('app.session_timeout'), Config::get('app.env') === 'production');
 
-return $config;
+return Config::all();

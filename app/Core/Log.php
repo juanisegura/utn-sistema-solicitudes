@@ -18,8 +18,8 @@ final class Log
     public static function configure(string $file, int $maxBytes, int $maxArchivos): void
     {
         self::$file = $file;
-        self::$maxBytes = max(1, $maxBytes);
-        self::$maxArchivos = max(0, $maxArchivos);
+        self::$maxBytes = $maxBytes;      // rangos validados en Config (AU-3)
+        self::$maxArchivos = $maxArchivos;
     }
 
     /**

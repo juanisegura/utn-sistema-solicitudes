@@ -39,12 +39,6 @@ final class Solicitud
         return Database::lastInsertId();
     }
 
-    /** @return list<array<string, mixed>> más recientes primero; filtradas si se pasa estado. */
-    public static function all(?Estado $estado = null): array
-    {
-        return self::buscar($estado, null, PHP_INT_MAX, 0);
-    }
-
     /**
      * Página del listado, más recientes primero (D-20). $q ya validado (o null = sin búsqueda).
      *

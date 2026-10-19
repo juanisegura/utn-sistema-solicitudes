@@ -14,8 +14,10 @@ debe permitir enumerar cuentas ni convertirse en una forma fácil de dejar al ad
 
 ## Decisión
 
-- Se registran solo los **intentos fallidos** en `login_intentos` (ip, SHA-256 del email
-  normalizado, created_at). El email no se guarda en claro.
+- En `login_intentos` (ip, SHA-256 del email normalizado, created_at; el email no se guarda en
+  claro) quedan solo los **intentos fallidos**. *Actualizado por D-46:* cada intento se
+  **reserva** (INSERT) antes de contar, y la fila se borra si queda bloqueado o si el login es
+  exitoso; al final quedan solo los fallidos, como antes.
 - Dos límites en una ventana de 15 min, configurables (`app.login_max_por_cuenta` = 5 por
   IP + email; `app.login_max_por_ip` = 20 por IP sola).
 - Si se alcanzó alguno, el intento **no se verifica** (ni `password_verify` ni consulta a
@@ -33,8 +35,9 @@ debe permitir enumerar cuentas ni convertirse en una forma fácil de dejar al ad
 - La ventana y el `Retry-After` se calculan en la DB (`NOW() - INTERVAL ? SECOND`,
   `TIMESTAMPDIFF`), con el mismo reloj que escribe `created_at`, independiente de la zona
   horaria de PHP (D-24).
-- IP = `REMOTE_ADDR`; no se confía en `X-Forwarded-For`, que cualquier cliente puede
-  falsificar.
+- IP = `REMOTE_ADDR`. *Actualizado por D-47:* `X-Forwarded-For` se usa solo si
+  `REMOTE_ADDR` está en `app.trusted_proxies` (ver Consecuencias, "Proxy o CDN delante"); sin
+  proxies configurados se ignora, porque cualquier cliente lo puede falsificar.
 - La política vive en `App\Core\LoginThrottle`, separada de `Auth`: Auth decide si las
   credenciales son válidas; el throttle, si se permite intentarlo.
 

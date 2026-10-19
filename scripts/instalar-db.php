@@ -62,11 +62,21 @@ try {
     fwrite(STDERR, 'Error: ' . $e->getMessage() . "\n");
     exit(1);
 }
-if ($config['app']['env'] === 'production' && !in_array('--force', $args, true)) {
-    fwrite(STDERR, "Abortado: app.env es 'production' y este script BORRA las tablas.\n"
-        . "En producción: php scripts/instalar-db.php --sin-datos --force y después\n"
-        . "php scripts/crear-admin.php (nunca el seed: su admin tiene password demo pública).\n");
-    exit(1);
+// Producción (AU-2): el seed no se carga nunca, ni con --force (su admin tiene password demo
+// pública). Solo se permite --sin-datos --force y después crear-admin.php.
+if ($config['app']['env'] === 'production') {
+    if ($conDatos) {
+        fwrite(STDERR, "Abortado: app.env es 'production' y en producción el seed (admin con password demo\n"
+            . "pública) no se carga nunca, ni con --force. Usar: php scripts/instalar-db.php --sin-datos --force\n"
+            . "y después php scripts/crear-admin.php.\n");
+        exit(1);
+    }
+    if (!in_array('--force', $args, true)) {
+        fwrite(STDERR, "Abortado: app.env es 'production' y este script BORRA las tablas.\n"
+            . "Si es lo que querés: php scripts/instalar-db.php --sin-datos --force y después\n"
+            . "php scripts/crear-admin.php.\n");
+        exit(1);
+    }
 }
 $dirDb = dirname(__DIR__) . '/database';
 

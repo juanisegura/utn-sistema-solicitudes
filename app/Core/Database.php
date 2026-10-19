@@ -107,6 +107,10 @@ final class Database
             ]);
             // Modo estricto explícito: sin él, MySQL guarda '' ante un ENUM inválido o trunca en silencio.
             $pdo->exec("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
+            // AU-4 / D-24: NOW() y CURRENT_TIMESTAMP en la misma zona que PHP. Con el offset numérico
+            // ('-03:00') no depende de que el servidor tenga cargadas las tablas de zonas horarias.
+            $stmt = $pdo->prepare('SET time_zone = ?');
+            $stmt->execute([(new \DateTimeImmutable('now'))->format('P')]);
 
             return $pdo;
         } catch (PDOException $e) {

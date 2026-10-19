@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-/** Sesión endurecida + flash messages + old input. Un único punto de configuración de la cookie. */
+/** Sesión endurecida + flash messages. Un único punto de configuración de la cookie. */
 final class Session
 {
     public const NAME = 'utn_sesion';
 
     private const LAST_ACTIVITY = '_last_activity';
     private const FLASH = '_flash';
-    private const OLD = '_old';
 
     private static int $idleTimeout = 1800;
     private static bool $forceSecure = false;
-
-    /** @var array<string, string> old input de la request anterior (se consume al arrancar) */
-    private static array $old = [];
 
     /**
      * Parámetros que usará start(); los fija bootstrap con la config, sin abrir la sesión (M-5:
@@ -57,8 +53,6 @@ final class Session
 
         self::$idleTimeout = $idleTimeout;
         self::expireIfIdle();
-        self::$old = $_SESSION[self::OLD] ?? [];
-        unset($_SESSION[self::OLD]);
     }
 
     /** Llamar al cambiar de privilegio (login): nuevo ID, mismos datos, el viejo se borra. */
@@ -115,17 +109,6 @@ final class Session
     public static function peekFlash(string $key): mixed
     {
         return $_SESSION[self::FLASH][$key] ?? null;
-    }
-
-    /** @param array<string, string> $input valores a re-mostrar tras un redirect (nunca passwords) */
-    public static function flashInput(array $input): void
-    {
-        $_SESSION[self::OLD] = $input;
-    }
-
-    public static function old(string $key): string
-    {
-        return self::$old[$key] ?? '';
     }
 
     private static function expireIfIdle(): void

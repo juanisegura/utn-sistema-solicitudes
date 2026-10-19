@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-
+/**
+ * Emisión de respuestas: HTML con status y headers, y los cortes de flujo (abort/redirect), que
+ * se lanzan como HttpException y emite send() desde Kernel (D-57).
+ */
 final class Response
 {
     /** Códigos con vista propia en app/Views/errors/; cualquier otro usa la de 500 (texto genérico). */
@@ -32,11 +35,10 @@ final class Response
     /**
      * Redirect a un path local. Lanza HttpException (D-57): el flujo se corta igual que con exit,
      * pero lo que sigue (sesión, buffers) termina normalmente y el despacho se puede testear.
-     * Solo paths locales: evita open redirects si algún día el destino sale de la entrada.
+     * HttpException valida el status 3xx y que el path sea local (InvalidArgumentException si no).
      */
     public static function redirect(string $path, int $status = 302): never
     {
-        // HttpException valida status 3xx y path local en un único lugar (InvalidArgumentException si no).
         throw new HttpException($status, ['Location' => $path]);
     }
 

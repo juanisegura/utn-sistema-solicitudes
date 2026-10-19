@@ -37,6 +37,8 @@ CREATE TABLE solicitudes (
     PRIMARY KEY (id),
     -- Cubre el listado del panel: filtro por estado ordenado por fecha.
     KEY idx_estado_fecha (estado, created_at),
+    -- Listado "Todas" ordenado por fecha sin filtro de estado (AU-11).
+    KEY idx_created (created_at),
     -- Prefiltro de la búsqueda del panel (ADR-0011): mismas columnas que Solicitud::BUSCABLES.
     FULLTEXT KEY ft_busqueda (asunto, nombre, email, descripcion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -50,7 +52,8 @@ CREATE TABLE login_intentos (
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_cuenta (ip, email_hash, created_at), -- límite por IP + email
-    KEY idx_ip (ip, created_at)                  -- límite por IP sola
+    KEY idx_ip (ip, created_at),                 -- límite por IP sola
+    KEY idx_created (created_at)                 -- purgar() de registros viejos (AU-11)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Historial de cambios de estado (ADR-0010). Un evento por cambio real (mismo estado → sin evento).

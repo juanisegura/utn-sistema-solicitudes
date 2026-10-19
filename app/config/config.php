@@ -48,8 +48,6 @@ if (!is_array($local)) {
     throw new RuntimeException('app/config/config.local.php debe devolver un array.');
 }
 
-$config = array_replace_recursive($defaults, $local);
-// (bool) 'false' sería true: se interpreta como booleano y cualquier valor dudoso queda en false.
-$config['app']['debug'] = filter_var($config['app']['debug'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
-
-return $config;
+// Solo mezcla defaults + local. La validación y la normalización (tipos, rangos, debug forzado a
+// false en producción) están en un único lugar: App\Core\Config::configure() (AU-1, AU-3).
+return array_replace_recursive($defaults, $local);

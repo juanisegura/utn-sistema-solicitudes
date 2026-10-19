@@ -100,18 +100,20 @@ php scripts/crear-admin.php                       # pide nombre, email y contras
 ### Configuración opcional
 
 Además de `env`, `debug` y `db`, `config.local.php` puede reemplazar estos valores. Los
-defaults están en `app/config/config.php` y una configuración inválida se rechaza al arrancar.
+defaults están en `app/config/config.php`. Al arrancar, `App\Core\Config` valida tipos y rangos y
+rechaza una configuración inválida (error en el log y página 500 genérica). Con `env => 'production'`,
+`debug` queda siempre en `false`.
 
-| Clave (`app.…`) | Default | Para qué |
-|---|---|---|
-| `session_timeout` | `1800` | Segundos de inactividad antes de vaciar la sesión |
-| `login_max_por_cuenta` | `5` | Fallos de login tolerados por IP + email en la ventana |
-| `login_max_por_ip` | `20` | Fallos tolerados por IP, sea cual sea el email |
-| `login_ventana_seg` | `900` | Ventana del límite de intentos, en segundos |
-| `trusted_proxies` | `[]` | IPs o CIDR de proxies propios. Solo desde ellos se usa `X-Forwarded-For` ([ADR-0009](doc/adr/0009-limite-intentos-login.md)) |
-| `log_max_bytes` | `1048576` | Tamaño a partir del cual rota `storage/logs/app.log` |
-| `log_max_archivos` | `5` | Archivos viejos del log que se conservan |
-| `por_pagina` | `20` | Solicitudes por página en el panel |
+| Clave (`app.…`) | Default | Válido | Para qué |
+|---|---|---|---|
+| `session_timeout` | `1800` | entero ≥ 60 | Segundos de inactividad antes de vaciar la sesión |
+| `login_max_por_cuenta` | `5` | entero ≥ 1 | Fallos de login tolerados por IP + email en la ventana |
+| `login_max_por_ip` | `20` | entero ≥ 1 | Fallos tolerados por IP, sea cual sea el email |
+| `login_ventana_seg` | `900` | entero ≥ 1 | Ventana del límite de intentos, en segundos |
+| `trusted_proxies` | `[]` | lista de IP/CIDR | IPs o CIDR de proxies propios. Solo desde ellos se usa `X-Forwarded-For` ([ADR-0009](doc/adr/0009-limite-intentos-login.md)) |
+| `log_max_bytes` | `1048576` | entero ≥ 1024 | Tamaño a partir del cual rota `storage/logs/app.log` |
+| `log_max_archivos` | `5` | entero 1–50 | Archivos viejos del log que se conservan |
+| `por_pagina` | `20` | entero 1–100 | Solicitudes por página en el panel |
 
 ## Apache
 
@@ -139,8 +141,8 @@ bash tests/run-all.sh --evidencia   # además guarda la salida del smoke en doc/
 ```
 
 Recrea las tablas, así que hay que correrlo contra una base de desarrollo. No toca el
-servidor de `:8080`. Último resultado: 137 tests unitarios, 27 de integración y 84 casos
-de smoke, todo OK ([evidencia](doc/pruebas/evidencias/run-all-20261019-162131.txt)).
+servidor de `:8080`. Último resultado: 151 tests unitarios, 31 de integración y 84 casos
+de smoke, todo OK ([evidencia](doc/pruebas/evidencias/run-all-20261019-164135.txt)).
 
 Cada capa por separado:
 
@@ -212,7 +214,8 @@ tools/                 hook de registro de prompts
 
 - [Plan: alcance, diseño y validación](doc/PLAN.md)
 - [Resumen técnico](doc/RESUMEN-TECNICO.md)
-- [Decisiones de arquitectura (ADR 0001–0010)](doc/adr/)
+- [Decisiones de arquitectura (ADR 0001–0011)](doc/adr/)
+- [Auditoría final y triage de hallazgos](doc/auditoria/AUDITORIA-FINAL.md)
 - [Pruebas](doc/pruebas/PRUEBAS.md) y [tests/README.md](tests/README.md)
 - Uso de IA:
   - [bitácora de prompts](doc/ia/PROMPTS.md)

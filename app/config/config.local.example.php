@@ -1,11 +1,13 @@
 <?php
-// config.local.example.php — Plantilla de configuración local.
+// config.local.example.php — Plantilla de configuración local, pensada para DESARROLLO.
 // Copiar a config.local.php (ignorado por Git) y completar las credenciales.
 // Nunca versionar config.local.php.
+// En producción: 'env' => 'production' (fuerza debug = false aunque acá diga true) y nunca el seed.
+// Una configuración inválida (tipos o rangos) se rechaza al arrancar: ver App\Core\Config.
 return [
     'app' => [
         'env'      => 'local',          // local | production
-        'debug'    => true,             // false fuera de desarrollo: nunca mostrar errores internos
+        'debug'    => true,             // solo en desarrollo; con env = production se ignora (siempre false)
         'base_url' => 'http://localhost:8080',
         // Opcionales (defaults en config.php):
         // 'session_timeout'  => 1800,           // segundos de inactividad
