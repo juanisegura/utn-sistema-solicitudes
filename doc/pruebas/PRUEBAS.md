@@ -79,6 +79,17 @@ El detalle de cada caso (ID → descripción) está en `tests/README.md`, secci�
 
 Contra el código previo a A1-15, los tests de AU-1, AU-2 y AU-3 fallan (3 FAIL); con A1-15 pasan los 151 unitarios.
 
+**Funcionalidades finales (D-63, PLAN §7)**: pruebas escritas contra el contrato (A2-15), pendientes de la corrida oficial. Con ellas la suite pasa a **167 unitarios, 36 de integración y 107 casos smoke**. Las de F-3 (seguimiento) quedan PENDIENTE o fallan hasta A1-17.
+
+| Funcionalidad | Pruebas |
+|---|---|
+| F-1 límite de frecuencia del formulario + honeypot | smoke F1.1–F1.2 (429 + `Retry-After` + valores escapados) y HP.1–HP.3 (campo trampa oculto; 302 a `/gracias` genérica sin número; nada guardado); `integration/FuncionalidadesFinalesTest.php` (atómico bajo concurrencia; el 422 también cuenta); `unit/ConfigTest.php` (valores nuevos validados) |
+| F-2 registro de eventos de seguridad | `unit/SecurityLogTest.php` (formato, neutralización, `emailRef`, canal y rotación); integración: `security.log` sin datos personales en claro tras recorrer los flujos |
+| F-3 seguimiento público | smoke F3.1–F3.10 (código mostrado una vez, resultado sin datos privados, mismo 422 para todos los errores, normalización, sin código en URLs, límite de fallidos); `unit/CodigoSeguimientoTest.php`; integración: en la DB solo el hash |
+| F-5 cambio de contraseña | smoke PW.1–PW.8 (validaciones 422 sin re-mostrar contraseñas, flash, sesión vieja afuera, restauración); integración: invalidación por `password_changed_at` |
+
+**Requisito para el smoke** (F-1): una corrida completa hace 34 envíos del formulario antes de la sección F1, más que el default `app.form_max_por_ip = 5`. Se corre con una config de test con ese valor ≥ 40 y `FORM_MAX` exportado igual (detalle en `tests/README.md`, "Límite del formulario (F-1)").
+
 **Fuera de la verificación automática** (D-51): la versión mínima PHP 8.2 y MySQL 8.0 (el desarrollo usa PHP 8.5 y MariaDB 11.8). Procedimiento manual con contenedores en `tests/README.md`, sección "Corrida completa: run-all.sh".
 
 ## Pruebas manuales

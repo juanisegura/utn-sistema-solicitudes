@@ -23,6 +23,18 @@ RE_BLOQUEO='Demasiados intentos'
 LIMITE_CUENTA=5 VENTANA_SEG=900   # D-38: app.login_max_por_cuenta y ventana de 15 min
 RE_FUGA='SQLSTATE|PDOException|Stack trace|Fatal error|on line [0-9]+|You have an error in your SQL'
 ID_INEXISTENTE=999999999
+# Funcionalidades finales (PLAN §7, D-63). FORM_MAX y SEG_MAX deben coincidir con
+# app.form_max_por_ip y app.seguimiento_max_por_ip del servidor bajo prueba (ver tests/README.md:
+# una corrida completa hace ~35 envíos del formulario, más que el default 5).
+FORM_MAX="${FORM_MAX:-5}" SEG_MAX="${SEG_MAX:-10}"
+F_HONEYPOT=sitio_web
+F_PW_ACTUAL=password_actual F_PW_NUEVA=password_nueva F_PW_CONF=password_confirmacion
+F_SEG_NUM="${F_SEG_NUM:-numero}" F_SEG_COD="${F_SEG_COD:-codigo}"   # F-3: a confirmar en A1-17
+RE_ENVIOS='Demasiados env.{1,2}os'
+RE_SEG_ERROR='N.{1,2}mero o c.{1,2}digo incorrectos'
+RE_PW_OK='Contrase.{1,2}a actualizada'
+# Código de seguimiento en /gracias: grupos de caracteres base32 separados por guiones (≥ 26 sin separadores)
+RE_CODIGO='[A-Z0-9]{4}(-[A-Z0-9]{1,4}){5,}'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_DIR="$SCRIPT_DIR/.tmp"
@@ -71,7 +83,16 @@ req() {
   CODE=$(curl -s --connect-timeout 3 --max-time 15 -X "$method" -b "$jar" -c "$jar" \
     -o "$BODY" -D "$HDRS" -w '%{http_code}' "$@" "$BASE_URL$path") || true
   [[ -n $CODE ]] || CODE=000
+  # F-1: cuenta los envíos del formulario que pasaron el CSRF (los 429 no cuentan: se borran)
+  if [[ $method == POST && $path == /solicitudes ]]; then
+    if [[ $CODE == 302 || $CODE == 422 ]]; then FORM_N=$((FORM_N + 1)); fi
+    if [[ $CODE == 429 && -z ${F1_EN_CURSO:-} && -z ${AVISO_FORM:-} ]]; then
+      AVISO_FORM=1
+      echo "AVISO: POST /solicitudes → 429 antes de la sección F-1 (envío n.º $((FORM_N + 1))). El servidor tiene app.form_max_por_ip menor que lo que hace una corrida: configurar ≥ 40 y exportar FORM_MAX con ese valor (tests/README.md)."
+    fi
+  fi
 }
+FORM_N=0
 # post <jar> <ruta> [campo=valor...] — valores url-encodeados por curl
 post() {
   local jar=$1 path=$2; shift 2
@@ -521,19 +542,185 @@ else
   skip "sin sesión de admin o token" S.7 S.8
 fi
 
-seccion "L — Límite de intentos de login (D-38; requiere DB recién reinstalada)"
-# Los fallos persisten 15 min en login_intentos: una segunda corrida sin reinstalar encuentra al
-# admin demo bloqueado por L.3. Presupuesto por IP (límite 20): fallos válidos de toda la corrida
-# = P4.1, P4.2, H.16 + 5 de L.1 + 5 de L.3 + hasta 2 de L.6 = 15 (los 429 no se registran,
-# PLAN §Extra 1 "Precisiones"); P5.1, L.2 y L.7 además borran los fallos del admin. L.4 reutiliza
-# la secuencia de L.1 para no gastar 5 más. L.3 bloquea al admin demo: después solo va L.6, que
-# justamente necesita al admin bloqueado.
-
 # retry_ok → "sí" si el último response trae Retry-After entero en [1, VENTANA_SEG]
 retry_ok() {
   local ra; ra=$(header Retry-After)
   [[ $ra =~ ^[0-9]+$ ]] && ((ra >= 1 && ra <= VENTANA_SEG)) && echo sí || echo no
 }
+
+seccion "F3 — Seguimiento público (F-3, D-63)"
+# Alta propia → número y código en /gracias → POST /seguimiento. Los intentos fallidos cuentan en
+# el límite propio del seguimiento (SEG_MAX por IP en 15 min); al final se agota a propósito.
+J_F3="$TMP_DIR/f3.cookies"; : > "$J_F3"
+req "$J_F3" GET /
+T_F3=$(csrf_de "$BODY")
+F3_DESC="Descripción privada $MARCA-f3"
+post "$J_F3" /solicitudes "$CSRF_FIELD=$T_F3" "$F_NOMBRE=Seguimiento Prueba" "$F_EMAIL=seguimiento-$MARCA@example.com" \
+  "$F_ASUNTO=Seguimiento $MARCA-f3" "$F_DESC=$F3_DESC"
+F3_ALTA="$CODE $(loc)"
+req "$J_F3" GET /gracias
+F3_NUM=$(grep -oE '#[0-9]+' "$BODY" | head -1 | tr -d '#')
+F3_COD=$(grep -oE "$RE_CODIGO" "$BODY" | head -1)
+F3_COD_LIMPIO=$(tr -d -- '- ' <<< "$F3_COD")
+check F3.1 "alta → /gracias muestra el número y un código de seguimiento legible (≥ 26 caracteres base32)" \
+  "302 /gracias 200 sí sí" \
+  "$F3_ALTA $CODE $([[ -n $F3_NUM ]] && echo sí || echo no) $([[ ${#F3_COD_LIMPIO} -ge 26 ]] && echo sí || echo no)"
+req "$J_F3" GET /gracias
+check F3.2 "el código se muestra una sola vez (recargar /gracias no lo vuelve a mostrar)" "no" \
+  "$([[ -n $F3_COD ]] && hasF "$F3_COD" || echo no)"
+
+# El admin cambia el estado para que el seguimiento muestre historial
+J_F3A="$TMP_DIR/f3admin.cookies"; : > "$J_F3A"
+req "$J_F3A" GET /admin/login
+post "$J_F3A" /admin/login "$CSRF_FIELD=$(csrf_de "$BODY")" "$F_LOGIN_EMAIL=$ADMIN_EMAIL" "$F_LOGIN_PASS=$ADMIN_PASSWORD"
+if [[ -n $F3_NUM ]]; then
+  req "$J_F3A" GET "/admin/solicitudes/$F3_NUM"
+  post "$J_F3A" "/admin/solicitudes/$F3_NUM/estado" "$CSRF_FIELD=$(csrf_de "$BODY")" "$F_ESTADO=en_proceso"
+fi
+
+seg() { # seg <número> <código> → POST /seguimiento con sesión propia
+  req "$J_F3" GET /seguimiento
+  post "$J_F3" /seguimiento "$CSRF_FIELD=$(csrf_de "$BODY")" "$F_SEG_NUM=$1" "$F_SEG_COD=$2"
+}
+if [[ -n $F3_NUM && -n $F3_COD ]]; then
+  req "$J_F3" GET /seguimiento
+  check F3.3 "GET /seguimiento → 200 con formulario y token CSRF" "200 sí" "$CODE $([[ -n $(csrf_de "$BODY") ]] && echo sí || echo no)"
+  seg "$F3_NUM" "$F3_COD"
+  check F3.4 "número + código correctos → 200 en la respuesta del POST (sin redirect): asunto, estado y historial" \
+    "200 - sí sí sí" \
+    "$CODE $( [[ -z $(header Location) ]] && echo - || echo con-location) $(hasF "Seguimiento $MARCA-f3") $(has 'En proceso') $(has 'Pendiente')"
+  check F3.5 "el resultado no muestra email, descripción ni nombre del admin" "no no no" \
+    "$(hasF "seguimiento-$MARCA@example.com") $(hasF "$F3_DESC") $(hasF 'Administrador Demo')"
+  F3_VAR=$(tr '[:upper:]' '[:lower:]' <<< "$F3_COD")
+  seg "$F3_NUM" "$F3_VAR"; N1=$CODE
+  seg "$F3_NUM" "$F3_COD_LIMPIO"; N2=$CODE
+  seg "$F3_NUM" "  $(sed 's/-/ /g' <<< "$F3_COD")  "; N3=$CODE
+  check F3.6 "normalización: minúsculas, sin guiones y con espacios → 200" "200 200 200" "$N1 $N2 $N3"
+  # Fallidos: todos el mismo 422 con el mismo mensaje (no distingue los casos)
+  F3_MAL=""
+  seg "$F3_NUM" "AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AA"; F3_MAL+="$CODE:$(has "$RE_SEG_ERROR") "
+  seg "$ID_INEXISTENTE" "$F3_COD"; F3_MAL+="$CODE:$(has "$RE_SEG_ERROR") "
+  seg 1 "$F3_COD"; F3_MAL+="$CODE:$(has "$RE_SEG_ERROR")"
+  check F3.7 "código incorrecto, número inexistente y número sin código (seed) → mismo 422 «Número o código incorrectos.»" \
+    "422:sí 422:sí 422:sí" "$F3_MAL"
+  check F3.8 "el código nunca viaja en una URL (ningún Location ni el action del form lo contienen)" "no" \
+    "$(grep -rlF -- "$F3_COD_LIMPIO" "$TMP_DIR"/*.hdrs 2>/dev/null | head -1 | grep -q . && echo sí || echo no)"
+  # Agotar el límite: ya hubo 3 fallidos; SEG_MAX - 3 más todavía dan 422 y el siguiente, 429
+  F3_LIM=""
+  for ((i = 4; i <= SEG_MAX; i++)); do seg "$F3_NUM" "BBBB-BBBB-BBBB-BBBB-BBBB-BBBB-B$((i % 10))"; F3_LIM+="${CODE:0:1}"; done
+  seg "$F3_NUM" "CCCC-CCCC-CCCC-CCCC-CCCC-CCCC-CC"
+  check F3.9 "límite de fallidos: el intento SEG_MAX+1 → 429 con Retry-After" \
+    "$(printf '4%.0s' $(seq 4 "$SEG_MAX")) 429 sí" "$F3_LIM $CODE $(retry_ok)"
+  seg "$F3_NUM" "$F3_COD"
+  check F3.10 "bloqueado, ni el código correcto se verifica → 429" "429" "$CODE"
+else
+  skip "sin número o código en /gracias" F3.3 F3.4 F3.5 F3.6 F3.7 F3.8 F3.9 F3.10
+fi
+
+seccion "HP — Honeypot del formulario (F-1, D-63)"
+J_HP="$TMP_DIR/hp.cookies"; : > "$J_HP"
+req "$J_HP" GET /
+check HP.1 "el formulario trae el campo trampa oculto (div.hp aria-hidden, tabindex -1, autocomplete off)" "sí sí sí" \
+  "$(has 'class="hp"[^>]*aria-hidden="true"|aria-hidden="true"[^>]*class="hp"') $(has "name=\"$F_HONEYPOT\"[^>]*tabindex=\"-1\"|tabindex=\"-1\"[^>]*name=\"$F_HONEYPOT\"") $(has "name=\"$F_HONEYPOT\"[^>]*autocomplete=\"off\"|autocomplete=\"off\"[^>]*name=\"$F_HONEYPOT\"")"
+post "$J_HP" /solicitudes "$CSRF_FIELD=$(csrf_de "$BODY")" "$F_NOMBRE=Bot" "$F_EMAIL=bot@example.com" \
+  "$F_ASUNTO=Honeypot $MARCA-hp" "$F_DESC=spam" "$F_HONEYPOT=https://spam.example"
+HP_POST="$CODE $(loc)"
+req "$J_HP" GET /gracias
+check HP.2 "honeypot completo → 302 a /gracias genérica (sin número, sin «#», sin código)" "302 /gracias 200 sí no no" \
+  "$HP_POST $CODE $(has 'Recibimos tu solicitud') $(has '#[0-9]+') $(has "$RE_CODIGO")"
+req "$J_F3A" GET "/admin?q=$(urlenc "$MARCA-hp")"
+check HP.3 "honeypot: no se guarda nada (búsqueda de la marca en el panel → 0)" "200 sí" "$CODE $(has '(^|[^0-9])0 resultados')"
+
+seccion "PW — Cambio de contraseña del admin (F-5, D-63)"
+J_PW_A="$TMP_DIR/pwa.cookies" J_PW_B="$TMP_DIR/pwb.cookies" J_PW_C="$TMP_DIR/pwc.cookies"
+: > "$J_PW_A"; : > "$J_PW_B"; : > "$J_PW_C"
+nuevo_jar
+req "$J_NUEVO" GET /admin/cuenta/password
+F5_ANON="$CODE $(loc)"
+post "$J_NUEVO" /admin/cuenta/password "$F_PW_ACTUAL=x" "$F_PW_NUEVA=y" "$F_PW_CONF=y"
+check PW.1 "sin sesión: GET → 302 a login; POST → 401" "302 /admin/login 401" "$F5_ANON $CODE"
+for j in "$J_PW_A" "$J_PW_B"; do
+  req "$j" GET /admin/login
+  post "$j" /admin/login "$CSRF_FIELD=$(csrf_de "$BODY")" "$F_LOGIN_EMAIL=$ADMIN_EMAIL" "$F_LOGIN_PASS=$ADMIN_PASSWORD"
+done
+req "$J_PW_A" GET /admin
+F5_LINK=$(has 'href="/admin/cuenta/password"')
+req "$J_PW_A" GET /admin/cuenta/password
+T_PW=$(csrf_de "$BODY")
+check PW.2 "con sesión: link «Cambiar contraseña» en el panel y GET del formulario → 200 con CSRF" "sí 200 sí" \
+  "$F5_LINK $CODE $([[ -n $T_PW ]] && echo sí || echo no)"
+PW_NUEVA="Nueva-$MARCA-xyz"
+pw() { # pw <actual> <nueva> <confirmación> (valores url-encodeados por curl)
+  post "$J_PW_A" /admin/cuenta/password "$CSRF_FIELD=$T_PW" "$F_PW_ACTUAL=$1" "$F_PW_NUEVA=$2" "$F_PW_CONF=$3"
+}
+F5_ERR=""
+pw "incorrecta-$MARCA" "$PW_NUEVA" "$PW_NUEVA"; F5_ERR+="$CODE:$(hasF "incorrecta-$MARCA")$(hasF "$PW_NUEVA") "
+pw "$ADMIN_PASSWORD" "Corta-11ch!" "Corta-11ch!"; F5_ERR+="$CODE:$(hasF 'Corta-11ch!') "
+pw "$ADMIN_PASSWORD" "$ADMIN_PASSWORD" "$ADMIN_PASSWORD"; F5_ERR+="$CODE "
+pw "$ADMIN_PASSWORD" "$PW_NUEVA" "$PW_NUEVA-distinta"; F5_ERR+="$CODE"
+check PW.3 "actual incorrecta, nueva < 12, igual a la actual y confirmación distinta → 422, sin re-mostrar contraseñas" \
+  "422:nono 422:no 422 422" "$F5_ERR"
+req "$J_PW_A" POST /admin/cuenta/password --data-urlencode "$CSRF_FIELD=$T_PW" \
+  --data-urlencode "$F_PW_ACTUAL=$ADMIN_PASSWORD" --data "$F_PW_NUEVA=Nueva-con-nulo%00xx&$F_PW_CONF=Nueva-con-nulo%00xx"
+F5_NUL=$CODE
+req "$J_PW_A" POST /admin/cuenta/password --data-urlencode "$CSRF_FIELD=$T_PW" \
+  --data-urlencode "$F_PW_ACTUAL=$ADMIN_PASSWORD" --data-urlencode "$F_PW_NUEVA=$(printf 'x%.0s' $(seq 1 73))" \
+  --data-urlencode "$F_PW_CONF=$(printf 'x%.0s' $(seq 1 73))"
+check PW.4 "nueva con NUL o de más de 72 bytes → 422" "422 422" "$F5_NUL $CODE"
+pw "$ADMIN_PASSWORD" "$PW_NUEVA" "$PW_NUEVA"
+F5_OK="$CODE $(loc)"
+req "$J_PW_A" GET /admin
+F5_OK+=" $CODE $(has "$RE_PW_OK")"
+check PW.5 "cambio correcto → 302 al panel con flash «Contraseña actualizada.»" "302 /admin 200 sí" "$F5_OK"
+req "$J_PW_B" GET /admin
+F5_B="$CODE $(loc)"
+req "$J_PW_A" GET /admin
+check PW.6 "la otra sesión (abierta antes del cambio) queda afuera; la que cambió sigue" "302 /admin/login 200" "$F5_B $CODE"
+req "$J_PW_C" GET /admin/login
+post "$J_PW_C" /admin/login "$CSRF_FIELD=$(csrf_de "$BODY")" "$F_LOGIN_EMAIL=$ADMIN_EMAIL" "$F_LOGIN_PASS=$PW_NUEVA"
+check PW.7 "login con la contraseña nueva → 302 /admin" "302 /admin" "$CODE $(loc)"
+# Restaurar la contraseña demo para lo que sigue (L.2, L.3 y corridas futuras)
+req "$J_PW_A" GET /admin/cuenta/password
+T_PW=$(csrf_de "$BODY")
+pw "$PW_NUEVA" "$ADMIN_PASSWORD" "$ADMIN_PASSWORD"
+check PW.8 "restaurar la contraseña demo → 302" "302 /admin" "$CODE $(loc)"
+[[ $CODE == 302 ]] || echo "AVISO: la contraseña del admin demo quedó en «$PW_NUEVA»: reinstalar la DB."
+
+seccion "F1 — Límite de envíos del formulario público (F-1, D-63)"
+# Hasta acá la corrida hizo FORM_N envíos que pasaron el CSRF (302/422). Se completan hasta
+# FORM_MAX con envíos inválidos (422, no crean filas) y el siguiente tiene que dar 429.
+F1_EN_CURSO=1
+J_F1="$TMP_DIR/f1.cookies"; : > "$J_F1"
+req "$J_F1" GET /
+T_F1=$(csrf_de "$BODY")
+F1_FALTAN=$((FORM_MAX - FORM_N))
+if ((F1_FALTAN < 0)); then
+  check F1.1 "FORM_MAX ($FORM_MAX) alcanza para los $FORM_N envíos de la corrida" "sí" "no"
+  skip "FORM_MAX menor que los envíos de la corrida" F1.2
+else
+  F1_PREV=""
+  for ((i = 1; i <= F1_FALTAN; i++)); do
+    post "$J_F1" /solicitudes "$CSRF_FIELD=$T_F1" "$F_NOMBRE=F1 $i" "$F_EMAIL=no-es-email" "$F_ASUNTO=F1 $MARCA" "$F_DESC=x"
+    F1_PREV+="${CODE:0:1}"
+  done
+  post "$J_F1" /solicitudes "$CSRF_FIELD=$T_F1" "$F_NOMBRE=<b>F1-$MARCA</b>" "$F_EMAIL=f1@example.com" \
+    "$F_ASUNTO=Asunto F1 $MARCA" "$F_DESC=x"
+  check F1.1 "envío n.º FORM_MAX+1 ($((FORM_MAX + 1))) en la ventana → 429 + Retry-After + «Demasiados envíos»" \
+    "$(printf '4%.0s' $(seq 1 "$F1_FALTAN")) 429 sí sí" "$F1_PREV $CODE $(retry_ok) $(has "$RE_ENVIOS")"
+  check F1.2 "el 429 re-muestra los valores escapados (role=alert) y nunca crudos" "sí sí no" \
+    "$(hasF '&lt;b&gt;F1-') $(has 'role="alert"') $(hasF '<b>F1-')"
+fi
+F1_EN_CURSO=
+
+seccion "L — Límite de intentos de login (D-38; requiere DB recién reinstalada)"
+# Los fallos persisten 15 min en login_intentos: una segunda corrida sin reinstalar encuentra al
+# admin demo bloqueado por L.3. Presupuesto por IP (límite 20): fallos válidos de toda la corrida
+# = P4.1, P4.2, H.16 + 1 de PW.3 (actual incorrecta, D-63) + 5 de L.1 + 5 de L.3 + hasta 2 de
+# L.6 = 16 (los 429 no se registran,
+# PLAN §Extra 1 "Precisiones"); P5.1, L.2 y L.7 además borran los fallos del admin. L.4 reutiliza
+# la secuencia de L.1 para no gastar 5 más. L.3 bloquea al admin demo: después solo va L.6, que
+# justamente necesita al admin bloqueado.
+
 # fallo_login <jar> <token|''> <email> <password> → deja CODE (sin token: no manda el campo)
 fallo_login() {
   local jar=$1 tok=$2 email=$3 pass=$4

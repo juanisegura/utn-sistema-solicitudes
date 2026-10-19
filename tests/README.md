@@ -1,6 +1,6 @@
 # Tests (`tests/`)
 
-Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). Con las correcciones de la auditoría final (A2-14): **151 unitarios, 31 de integración y 84 casos smoke** (la corrida oficial vigente, en `doc/pruebas/PRUEBAS.md`).md`). La forma oficial de correr todo es **`bash tests/run-all.sh`** (sección "Corrida completa: run-all.sh" al final); no hay CI en GitHub (D-51).
+Tres capas: **unitarios** (`tests/unit/`, puros, sin DB ni red), **integración** (`tests/integration/`, contra la DB y la app en marcha) y **smoke HTTP** (`tests/smoke.sh`, las pruebas mínimas de la consigna). Con las funcionalidades finales (A2-15, D-63): **167 unitarios, 36 de integración y 107 casos smoke** (los de F-3 quedan PENDIENTE o fallan hasta A1-17; la corrida oficial vigente, en `doc/pruebas/PRUEBAS.md`).md`). La forma oficial de correr todo es **`bash tests/run-all.sh`** (sección "Corrida completa: run-all.sh" al final); no hay CI en GitHub (D-51).
 
 # Smoke HTTP (`tests/smoke.sh`)
 
@@ -29,7 +29,7 @@ Las verificaciones de persistencia se hacen por HTTP, a través del panel admin 
   tests/smoke.sh -h
   ```
 
-- Variables de entorno sobreescribibles: `BASE_URL`, `CSRF_FIELD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`. Por defecto, el admin demo del seed (`admin@example.com` y su contraseña demo).
+- Variables de entorno sobreescribibles: `BASE_URL`, `CSRF_FIELD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `FORM_MAX` y `SEG_MAX` (tienen que coincidir con `app.form_max_por_ip` y `app.seguimiento_max_por_ip` del servidor; ver "Límite del formulario (F-1)" abajo), `F_SEG_NUM` y `F_SEG_COD` (campos del formulario de seguimiento, F-3). Por defecto, el admin demo del seed (`admin@example.com` y su contraseña demo).
 - Cookies y respuestas temporales se guardan en `tests/.tmp/`. Está ignorado por git y se recrea en cada corrida.
 - Cada corrida crea filas nuevas marcadas con `smoke-<timestamp>-<pid>` en asuntos y textos. Ejecutar contra una base de desarrollo, nunca contra producción.
 
@@ -105,7 +105,7 @@ Columna "Prueba mínima": P1 a P7 corresponden a la consigna (P1 solicitud váli
 | P6.8 | estado como array (estado[]=resuelta) → 422, no 500 | P6 |
 | P7.1 | POST con `<script>` y `' OR '1'='1' -- ` en campos → 302 a /gracias (se acepta como texto) | P7 |
 | P7.2 | listado: `<script>` escapado (`&lt;script&gt;`) y nunca crudo | P7 |
-| F5.1 | listado por fecha descendente: la solicitud más nueva aparece primero (D-20) | extra · F5 |
+| F5.1 | listado por fecha descendente: la solicitud más nueva aparece primero (D-20) | extra · PW |
 | P7.3 | detalle: `<script>` e `<img onerror>` escapados, nunca crudos | P7 |
 | P7.4 | detalle: payload SQL guardado literal y escapado | P7 |
 | P7.5 | 422 re-renderiza valores previos escapados (sin XSS reflejado) | P7 |
@@ -128,6 +128,29 @@ Columna "Prueba mínima": P1 a P7 corresponden a la consigna (P1 solicitud váli
 | L.7 | email del admin en mayúsculas (`ADMIN@EXAMPLE.COM`) + password correcta → 302, /admin 200, logout 302 (la normalización a minúsculas sigue vigente con D-41) | extra · L (D-41) |
 | L.3 | admin demo: 5 fallos → 401; el 6.º con la password **correcta** → 429 + Retry-After + mensaje; /admin sigue en 302 a login | extra · L (D-38) |
 | L.6 | con el admin bloqueado (después de L.3): `ádmin@example.com` y `ÁDMIN@example.com` + password correcta → 401 o 429, nunca 302; /admin sigue en 302 a login (bypass por acentos, D-41) | extra · L (D-41) |
+| F3.1 | alta → `/gracias` con el número y el código de seguimiento (≥ 26 caracteres base32 en grupos) | extra · F3 (D-63) |
+| F3.2 | el código se muestra una sola vez (recargar `/gracias` no lo repite) | extra · F3 |
+| F3.3 | `GET /seguimiento` → 200 con formulario y CSRF | extra · F3 |
+| F3.4 | número + código correctos → 200 en la respuesta del POST (sin redirect) con asunto, estado actual e historial | extra · F3 |
+| F3.5 | el resultado no muestra email, descripción ni nombre del admin | extra · F3 |
+| F3.6 | normalización del código: minúsculas, sin guiones, con espacios → 200 | extra · F3 |
+| F3.7 | código incorrecto, número inexistente y número sin código (seed) → el mismo 422 «Número o código incorrectos.» | extra · F3 |
+| F3.8 | el código nunca aparece en una URL (headers de toda la corrida) | extra · F3 |
+| F3.9 | intento fallido n.º SEG_MAX+1 → 429 con `Retry-After` | extra · F3 |
+| F3.10 | bloqueado, ni el código correcto se verifica → 429 | extra · F3 |
+| HP.1 | el formulario trae el campo trampa (`div.hp` con `aria-hidden`, `tabindex="-1"`, `autocomplete="off"`) | extra · HP (F-1) |
+| HP.2 | honeypot completo → 302 a `/gracias` genérica, sin número ni código | extra · HP |
+| HP.3 | honeypot: no se guarda nada (la marca no aparece en el panel) | extra · HP |
+| PW.1 | sin sesión: `GET /admin/cuenta/password` → 302 a login; POST → 401 | extra · PW (F-5, D-63) |
+| PW.2 | link «Cambiar contraseña» en el panel; formulario 200 con CSRF | extra · PW |
+| PW.3 | actual incorrecta, nueva < 12, igual a la actual, confirmación distinta → 422 sin re-mostrar contraseñas | extra · PW |
+| PW.4 | nueva con NUL o de más de 72 bytes → 422 | extra · PW |
+| PW.5 | cambio correcto → 302 al panel con flash «Contraseña actualizada.» | extra · PW |
+| PW.6 | la sesión abierta antes del cambio queda afuera; la que cambió sigue | extra · PW |
+| PW.7 | login con la contraseña nueva → 302 | extra · PW |
+| PW.8 | se restaura la contraseña demo (para L.2/L.3 y corridas futuras) | extra · PW |
+| F1.1 | envío n.º FORM_MAX+1 de la corrida → 429 + `Retry-After` + «Demasiados envíos» | extra · F1 (D-63) |
+| F1.2 | el 429 re-muestra los valores escapados (`role="alert"`), nunca crudos | extra · F1 |
 | B.1 | búsqueda `q=pag-<marca>` → 200, "21 resultados para «…»", 20 filas en la página 1 (filas creadas por la corrida) | extra · B (M-3) |
 | B.2 | `q` con `%` y `_` literales: encuentra `escA-<marca>-a%b_c` y no `escB-<marca>-aZZbYc` (comodines escapados) | extra · B (M-3) |
 | B.3 | `q=<script>alert('b3')</script>` reflejado escapado en el estado de búsqueda y en el `value` del input; nunca crudo | extra · B (M-3) |
@@ -178,8 +201,10 @@ php scripts/instalar-db.php   # borra y recrea las tablas, y carga el seed
 - Los casos inválidos no crean filas: P2.1 a P2.3, H.3 a H.5, P7.5 y H.12. Tampoco los intentos de login ni de cambio de estado rechazados (P4.x, P6.x).
 - El seed trae sus propias solicitudes, entre ellas una con `<script>`. Por eso P7.2 busca la fila de esta corrida por su marca y no la primera que contenga el payload.
 - La contraseña demo del admin del seed es la que usa `ADMIN_PASSWORD` por defecto (ver "Requisitos y ejecución").
-- **El smoke exige una DB recién reinstalada** (D-38): los intentos fallidos persisten 15 min en `login_intentos` y L.3 deja al admin demo bloqueado desde la IP de la corrida. Una segunda corrida sin reinstalar falla desde P5.1 (login → 429). Si el primer intento de L.1 ya da 429, el script avisa.
-- Presupuesto del límite por IP (20 fallos / 15 min): una corrida registra hasta 15 fallos válidos desde la misma IP (P4.1, P4.2, H.16, 5 de L.1, 5 de L.3 y hasta 2 de L.6 si responden 401); P5.1, L.2 y L.7 además borran los del admin, y los 429 no se registran (PLAN §Extra 1, "Precisiones"). Margen: 5. Agregar casos con logins fallidos exige rehacer esta cuenta.
+- **El smoke exige una DB recién reinstalada** (D-38, D-63): deja estado que dura en la ventana de cada límite. L.3 bloquea al admin demo 15 min desde la IP; F3.9 agota los intentos de seguimiento de la IP (15 min) y F1.1 los envíos del formulario (10 min); los envíos del formulario de toda la corrida también quedan contados. Una segunda corrida sin reinstalar falla desde P5.1 (login → 429) y da 429 en HP.2, PW.*, F3.* y F1.*. `run-all.sh` reinstala antes del smoke (etapa 5a); para correr el smoke suelto, `php scripts/instalar-db.php` antes. Si el primer intento de L.1 ya da 429, el script avisa.
+- Presupuesto del límite de login por IP (20 fallos / 15 min): una corrida registra hasta **16** fallos válidos desde la misma IP (P4.1, P4.2, H.16, PW.3 —la contraseña actual incorrecta cuenta como fallo de login de esa cuenta, D-63—, 5 de L.1, 5 de L.3 y hasta 2 de L.6); P5.1, L.2, L.7 y los logins de F3/PW además borran los del admin, y los 429 no se registran. Margen: 4. Agregar casos con logins fallidos exige rehacer esta cuenta.
+- **Límite del formulario (F-1, D-64)**: una corrida completa hace **34 envíos** de `POST /solicitudes` que pasan el CSRF antes de la sección F1 (P1/P2/H.14: 6; P7.1, P7.5 y H.12: 3; sección B: 23; F3: 1; honeypot: 1; los 419 de H.3–H.5 no cuentan), más que el default `app.form_max_por_ip = 5`. El límite no se sube en el código: **el smoke completo se corre con `bash tests/run-all.sh`**, que genera un archivo de config de test en un directorio propio de la corrida (`mktemp -d`, 0700, fuera del repo; el archivo, 600): incluye la config local con `require` y solo pisa `form_max_por_ip = 50`. El script no lee ni imprime la config, y borra ese directorio al terminar (también si falla), después de bajar el servidor. No va en `tests/.tmp` porque el smoke limpia ese directorio al arrancar y el servidor se quedaría sin config (500 en todo), levanta el servidor de prueba y corre la integración con `APP_CONFIG_LOCAL` apuntando a ese archivo, y le pasa `FORM_MAX=50` y `SEG_MAX=10` al smoke. `instalar-db` usa la config normal. **Contra `:8080` con la config de desarrollo**, el envío n.º 6 y los siguientes dan 429 —incluida la sección F1— y el smoke lo avisa: es lo esperado. El script cuenta sus envíos y, si recibe un 429 antes de F1, imprime el número de envío. F1 completa los que faltan hasta `FORM_MAX` con envíos inválidos (422) y verifica el 429 del siguiente; después la IP queda bloqueada para el formulario `app.form_ventana_seg` (10 min), por eso va al final, antes de L.
+- **Seguimiento (F-3)**: F3.7 y F3.9 hacen exactamente `SEG_MAX` intentos fallidos (default 10, como `app.seguimiento_max_por_ip`) y el siguiente da 429; la IP queda bloqueada para el seguimiento 15 min. Exportar `SEG_MAX` si la config de test usa otro valor.
 
 ## Prueba manual del límite por IP (L.5, D-38)
 
@@ -249,12 +274,15 @@ BASE_URL=http://localhost:8080 php tests/integration/run.php
 | `unit/FulltextQueryTest.php` (11) | `Solicitud::fulltextQuery` (R-1) | `+palabra*` por palabra de ≥ 3 caracteres Unicode, dígitos, stopwords de InnoDB (`the`, `com`, `with`…), operadores booleanos neutralizados, separadores, `null` → fallback LIKE |
 | `unit/KernelTest.php` (5) | `Kernel::handle` (R-2) | `abort`/ruta inexistente → 404 con la vista, redirect → 302 sin cuerpo, una excepción real no se traga, acción normal sin código de error (en hijo: `send()` emite headers y salida) |
 | `unit/LoginThrottleTest.php` (3) | `LoginThrottle::configure` (AU-7) | acepta enteros > 0 (también como texto); rechaza 0, negativos, decimales, texto, vacío, null, array y claves faltantes con un mensaje que nombra la clave |
-| `unit/ConfigTest.php` (5) | configuración (AU-1, AU-3) | sobre una copia con config de prueba: base válida; `env=production` fuerza `debug=false`; cada valor inválido (`session_timeout` < 60, `por_pagina` 0/101, `log_max_bytes` < 1024, `log_max_archivos` 0/51, `env` desconocido) → excepción que nombra la clave; bordes válidos |
+| `unit/ConfigTest.php` (7) | configuración (AU-1, AU-3) | sobre una copia con config de prueba: base válida; `env=production` fuerza `debug=false`; cada valor inválido (`session_timeout` < 60, `por_pagina` 0/101, `log_max_bytes` < 1024, `log_max_archivos` 0/51, `env` desconocido) → excepción que nombra la clave; bordes válidos; defaults e inválidos de `form_*` y `seguimiento_*` (F-1/F-3) |
 | `unit/InstalarDbTest.php` (5) | `scripts/instalar-db.php` (AU-2) | en producción: sin `--force` y con `--force` sin `--sin-datos` aborta antes de conectar; con `--force --sin-datos` pasa la guardia; local pasa; opción desconocida → uso |
+| `unit/SecurityLogTest.php` (9) | `SecurityLog` (F-2) | línea de 6 campos en orden, `-` sin admin, path sin query string, saltos/CR/separadores y controles neutralizados (también en evento, método y path), `emailRef` (12 hex del SHA-256 normalizado), canal `security` al lado de `app.log` y con la misma rotación |
+| `unit/CodigoSeguimientoTest.php` (5) | código de seguimiento (F-3) | formato en grupos, ≥ 26 caracteres útiles (128 bits), alfabeto sin ambiguos, únicos, normalización, hash = SHA-256 del normalizado y distinto del código; PENDIENTE hasta A1-17 (adaptador de nombres) |
 | `integration/EsquemaTest.php` (3) | esquema instalado y hora (AU-7, AU-4) | los tres ENUM de la DB = `Estado::cases()`; `NOW()` de la DB = `date()` de PHP ±2 s; `created_at` de una fila nueva en hora local ±2 s |
 | `integration/LoginAtomicidadTest.php` (3) | límite (M-1, D-46) | 4 fallos + ráfaga de 8 simultáneos → ≤ 1 verificado (401) y filas = previas + verificados ≤ 5; CSRF inválido no reserva; éxito no deja fila |
 | `integration/HistorialTransaccionTest.php` (9) | historial (M-2) | alta sin evento, evento con anterior/nuevo/admin, no-op sin evento, 422/404 sin evento, cambios simultáneos encadenados, FK CASCADE/RESTRICT; render real dentro de `<ol class="timeline">`: sin eventos no hay lista, y tras dos cambios + un no-op hay 2 ítems, el último primero, con anterior → nuevo (AU-6, Q-09) |
 | `integration/FulltextBusquedaTest.php` (13) | búsqueda híbrida (R-1) | índice `ft_busqueda` FULLTEXT de 4 columnas, `EXPLAIN` con `key=ft_busqueda`, prefijo, varias palabras, subcadena interna sin resultados (D-56), fallback LIKE (`%_`, `a_b`), confirmación de frase, guion bajo dentro de una palabra = LIKE, email completo, contadores = listado (Total y los tres estados, con uno en cero, también con filtro de estado: AU-6, C-2); token de más de 84 caracteres: el híbrido no lo encuentra y el LIKE sí (limitación documentada, D-61); variante acentuada de stopword (`cóm`) = LIKE (regresión del hallazgo de A2-11, corregido en d648f11); token de exactamente 84 |
+| `integration/FuncionalidadesFinalesTest.php` (5) | F-1, F-2, F-3, F-5 (D-63) | F-1 atómico (max-1 previos + 8 simultáneos → ≤ 1 pasa; filas y solicitudes coherentes) y el 422 también cuenta; F-3: en la DB solo `seguimiento_hash` = SHA-256 del normalizado, ninguna columna con el código, seed sin código; F-5: cambiar la contraseña invalida otra sesión y fija `password_changed_at`; F-2: tras recorrer los flujos, `security.log` sin contraseñas, emails, query strings ni datos del honeypot, con los eventos esperados y el email como referencia |
 | `integration/ControlFlujoTest.php` (3) | control de flujo (R-2) y `bootstrap-cli` (R-3) | 404/405/419/401/redirects sin escribir `app.log` ni vista 500; `Allow` en el 405; `bootstrap-cli.php` deja la DB lista sin sesión, salida ni handlers |
 
 ## Corrida completa: `run-all.sh` (D-51)
@@ -264,6 +292,7 @@ bash tests/run-all.sh                 # servidor de prueba propio en 127.0.0.1:8
 bash tests/run-all.sh --puerto 8095   # otro puerto (nunca 8080: es el de desarrollo)
 bash tests/run-all.sh --evidencia     # se lo pasa al smoke (doc/pruebas/evidencias/)
 bash tests/run-all.sh --continuar     # no corta en el primer fallo: corre todas las etapas (exit ≠ 0 si alguna falló)
+# El servidor de prueba y la integración usan APP_CONFIG_LOCAL con una config de test temporal (D-64)
 ```
 
 Etapas, en orden, cortando en el primer fallo: (1) `php -l` de `app/`, `public_html/`, `scripts/` y `tests/`; (2) unitarios; (3) `instalar-db`; (4) levanta un `php -S` propio con `PHP_CLI_SERVER_WORKERS=8` (concurrencia real para la ráfaga de M-1), espera a que responda y corre la integración con `SIN_SKIP=1`; (5) reinstala la DB y corre el smoke contra ese mismo servidor. Al salir (también si falla o con Ctrl+C) baja el servidor y su grupo de workers e imprime un resumen por etapa. Exit ≠ 0 si algo falló. No toca el servidor de desarrollo de `:8080` ni lee `config.local.php` (la DB la usa la app con su propia config). **Requiere turno exclusivo de DB** (D-42): borra y recrea las tablas; al terminar quedan el seed y las filas del smoke.

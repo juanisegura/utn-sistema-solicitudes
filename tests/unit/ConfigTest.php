@@ -60,3 +60,22 @@ test('AU-3: los bordes válidos se aceptan', function () {
         assertNull($r['error'], json_encode($cfg));
     }
 });
+
+// F-1/F-3 (D-63): valores nuevos de config, validados como el resto (AU-3).
+test('F-1/F-3: defaults del límite del formulario y del seguimiento', function () {
+    $r = configurarCopia(local([]));
+    assertNull($r['error']);
+    foreach (['form_max_por_ip' => 5, 'form_ventana_seg' => 600, 'seguimiento_max_por_ip' => 10, 'seguimiento_ventana_seg' => 900] as $k => $v) {
+        assertSame($v, (int) ($r['app'][$k] ?? -1), "app.{$k}");
+    }
+});
+
+test('F-1/F-3: valores inválidos de los límites nuevos → excepción que nombra la clave', function () {
+    foreach (['form_max_por_ip', 'form_ventana_seg', 'seguimiento_max_por_ip', 'seguimiento_ventana_seg'] as $clave) {
+        foreach ([0, -1, 'abc'] as $v) {
+            $r = configurarCopia(local([$clave => $v]));
+            assertTrue($r['error'] !== null, "app.{$clave} = " . exportar($v) . ' debía rechazarse');
+            assertContains($clave, (string) $r['error']);
+        }
+    }
+});

@@ -39,6 +39,29 @@ mkdir -p "$RAIZ/tests/.tmp"
 PID_SERVIDOR=""
 declare -a RESUMEN=()
 
+# Config de test (D-64): el smoke completo hace ~34 envíos del formulario público y el límite por
+# defecto (app.form_max_por_ip = 5) los cortaría. No se sube el límite en el código: el servidor
+# de prueba y la integración leen un archivo alternativo (APP_CONFIG_LOCAL) que incluye la config
+# local y solo pisa ese valor. Este script lo escribe; nunca lee ni imprime la config local.
+# El archivo vive en un directorio propio de esta corrida (mktemp -d, 0700, fuera del repo), no en
+# tests/.tmp: el smoke borra tests/.tmp al arrancar y el servidor se quedaría sin config (500 en
+# todo). Se borra en el trap EXIT, después de bajar el servidor.
+FORM_MAX_TEST=50
+DIR_CONFIG_TEST=""
+CONFIG_TEST=""
+escribir_config_test() {
+  DIR_CONFIG_TEST=$(mktemp -d "${TMPDIR:-/tmp}/utn-run-all.XXXXXX") || return 1
+  chmod 700 "$DIR_CONFIG_TEST"
+  CONFIG_TEST="$DIR_CONFIG_TEST/config.test.php"
+  ( umask 077; cat > "$CONFIG_TEST" ) <<PHP
+<?php
+// Generado por tests/run-all.sh (D-64): config local + límite del formulario para el smoke.
+\$c = require '$RAIZ/app/config/config.local.php';
+\$c['app']['form_max_por_ip'] = $FORM_MAX_TEST;
+return \$c;
+PHP
+}
+
 bajar_servidor() {
   if [[ -n $PID_SERVIDOR ]] && kill -0 "$PID_SERVIDOR" 2>/dev/null; then
     # Con workers, php -S tiene hijos: se baja el grupo entero.
@@ -55,6 +78,7 @@ imprimir_resumen() {
 al_salir() {
   local codigo=$?
   bajar_servidor
+  if [[ -n $DIR_CONFIG_TEST && -d $DIR_CONFIG_TEST ]]; then rm -rf -- "$DIR_CONFIG_TEST"; fi
   imprimir_resumen
   exit "$codigo"
 }
@@ -96,7 +120,8 @@ levantar_servidor() {
     return 1
   fi
   # setsid: grupo de procesos propio para poder bajar también los workers.
-  (cd "$RAIZ" && PHP_CLI_SERVER_WORKERS=$WORKERS exec setsid php -S "127.0.0.1:$PUERTO" \
+  escribir_config_test || { echo "No se pudo crear la config de test" >&2; return 1; }
+  (cd "$RAIZ" && APP_CONFIG_LOCAL=$CONFIG_TEST PHP_CLI_SERVER_WORKERS=$WORKERS exec setsid php -S "127.0.0.1:$PUERTO" \
     -t public_html public_html/index.php) > "$LOG_SERVIDOR" 2>&1 &
   PID_SERVIDOR=$!
   local i
@@ -115,7 +140,8 @@ levantar_servidor() {
 
 integracion() {
   levantar_servidor || return 1
-  BASE_URL=$BASE_URL SIN_SKIP=1 php "$RAIZ/tests/integration/run.php"
+  # La integración lee la misma config que el servidor (p. ej. form_max_por_ip para F-1 atómico).
+  APP_CONFIG_LOCAL=$CONFIG_TEST BASE_URL=$BASE_URL SIN_SKIP=1 php "$RAIZ/tests/integration/run.php"
 }
 
 cd "$RAIZ" || exit 2
@@ -124,7 +150,7 @@ etapa "2. Tests unitarios" php tests/unit/run.php
 etapa "3. Instalar DB" php scripts/instalar-db.php
 etapa "4. Tests de integración ($BASE_URL)" integracion
 etapa "5a. Reinstalar DB (el smoke exige DB recién instalada)" php scripts/instalar-db.php
-etapa "5b. Smoke HTTP ($BASE_URL)" bash tests/smoke.sh --base-url "$BASE_URL" "${EVIDENCIA[@]}"
+etapa "5b. Smoke HTTP ($BASE_URL)" env FORM_MAX=$FORM_MAX_TEST SEG_MAX=10 bash tests/smoke.sh --base-url "$BASE_URL" "${EVIDENCIA[@]}"
 if ((FALLAS > 0)); then
   RESUMEN+=("$FALLAS etapa(s) fallaron (--continuar).")
   exit 1
