@@ -222,3 +222,83 @@ test('F-2: security.log sin contraseñas, códigos, emails en claro ni query str
     }
     assertTrue(str_contains($nuevo, App\Core\SecurityLog::emailRef(adminEmail())), 'el email se correlaciona por su referencia');
 });
+
+// A2-16 (hallazgo): carrera en la invalidación de F-5. Auth::attempt verifica la contraseña (bcrypt,
+// ~250 ms) y recién después toma auth_at = NOW(6) en touchLastLogin. Si el cambio de contraseña se
+// confirma en ese intervalo, la sesión iniciada con la contraseña VIEJA queda con auth_at posterior
+// a password_changed_at y sobrevive al cambio. Los logins exitosos no cuentan en el límite, así que
+// quien tenga la contraseña robada puede reintentar hasta caer en la ventana. Se reproduce
+// escalonando logins con la contraseña vieja detrás del cambio. FALLA hasta el fix (tomar auth_at en
+// el mismo SELECT que lee el hash).
+test('F-5: ninguna sesión iniciada con la contraseña vieja sobrevive al cambio (carrera)', function () {
+    requiereServidor();
+    requiereDb();
+    $sobrevivientes = 0;
+    $aceptadas = 0;
+    for ($ronda = 0; $ronda < 2; $ronda++) {
+        $a = clienteAdmin();
+        $nueva = 'Carrera-' . bin2hex(random_bytes(4));
+        $cambio = $a->handle('POST', '/admin/cuenta/password', [
+            'csrf_token' => $a->token('/admin/cuenta/password'), 'password_actual' => adminPass(),
+            'password_nueva' => $nueva, 'password_confirmacion' => $nueva,
+        ]);
+        $intrusos = [];
+        $handles = [];
+        for ($i = 0; $i < 6; $i++) {
+            $c = new Cliente();
+            $intrusos[] = $c;
+            $handles[] = $c->handle('POST', '/admin/login', ['csrf_token' => $c->token('/admin/login'), 'email' => adminEmail(), 'password' => adminPass()]);
+        }
+        // El cambio sale primero; los logins, escalonados entre 150 y 525 ms después.
+        $mh = curl_multi_init();
+        curl_multi_add_handle($mh, $cambio);
+        $t0 = microtime(true);
+        $pend = $handles;
+        $k = 0;
+        do {
+            curl_multi_exec($mh, $activos);
+            while ($pend !== [] && microtime(true) - $t0 >= 0.15 + 0.075 * $k) {
+                curl_multi_add_handle($mh, array_shift($pend));
+                $k++;
+                curl_multi_exec($mh, $activos);
+            }
+            if ($activos > 0 || $pend !== []) {
+                curl_multi_select($mh, 0.01);
+            }
+        } while ($activos > 0 || $pend !== []);
+        $codigos = array_map(fn ($h) => (int) curl_getinfo($h, CURLINFO_RESPONSE_CODE), $handles);
+        $okCambio = (int) curl_getinfo($cambio, CURLINFO_RESPONSE_CODE);
+        foreach (array_merge([$cambio], $handles) as $h) {
+            curl_multi_remove_handle($mh, $h);
+        }
+        // El cookie jar de curl se escribe al destruir el handle: liberarlos antes de reusar los clientes.
+        unset($h, $cambio, $handles, $mh);
+        gc_collect_cycles();
+        try {
+            assertSame(302, $okCambio, 'el cambio de contraseña se aplicó');
+            foreach ($intrusos as $i => $c) {
+                if ($codigos[$i] === 302) {
+                    $aceptadas++;
+                    if ($c->get('/admin')['code'] === 200) {
+                        $sobrevivientes++;
+                    }
+                }
+            }
+        } finally {
+            $r = clienteConPass($nueva);
+            $r->post('/admin/cuenta/password', [
+                'csrf_token' => $r->token('/admin/cuenta/password'), 'password_actual' => $nueva,
+                'password_nueva' => adminPass(), 'password_confirmacion' => adminPass(),
+            ]);
+        }
+    }
+    assertSame(0, $sobrevivientes, "de {$aceptadas} logins con la contraseña vieja aceptados, {$sobrevivientes} siguen con sesión válida");
+});
+
+function clienteConPass(string $pass): Cliente
+{
+    $c = new Cliente();
+    assertSame(302, $c->login(adminEmail(), $pass)['code'], 'login con la contraseña nueva');
+
+    return $c;
+}

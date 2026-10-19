@@ -65,9 +65,12 @@ test('ráfaga de ' . RAFAGA . ' logins simultáneos con 4 fallos previos: como m
         assertSame(LIMITE_CUENTA - 1 + $n401, $filas, 'filas finales = previas + verificados (los bloqueados borran su reserva)');
         assertTrue($filas <= LIMITE_CUENTA, "nunca más de " . LIMITE_CUENTA . " filas en la ventana ({$filas})");
 
-        // Un intento más, ya en serie, tiene que estar bloqueado.
+        // Un intento más, ya en serie: bloqueado si la cuenta llegó al límite. Si la ráfaga bloqueó los
+        // 8 (bloquear de más está permitido, D-46), quedan 4 filas y este es el 5.º, legítimo → 401.
         $r = $previo->post('/admin/login', ['csrf_token' => $token, 'email' => $email, 'password' => 'mala-final']);
-        assertSame(429, $r['code'], 'después de la ráfaga la cuenta queda bloqueada');
+        assertSame($filas >= LIMITE_CUENTA ? 429 : 401, $r['code'], "intento posterior con {$filas} filas en la ventana");
+        $r = $previo->post('/admin/login', ['csrf_token' => $token, 'email' => $email, 'password' => 'mala-final-2']);
+        assertSame(429, $r['code'], 'con el límite alcanzado, el siguiente queda bloqueado');
 
     } finally {
         requiereDb()->prepare('DELETE FROM login_intentos WHERE email_hash = ?')->execute([$hash]);
