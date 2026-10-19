@@ -12,7 +12,7 @@ con asistencia de IA: un orquestador, un implementador y un revisor
 ([ADR-0002](adr/0002-metodo-ia-orquestador-agentes.md)).
 
 La verificación local completa (`bash tests/run-all.sh`) da todo OK (detalle en
-[PRUEBAS](pruebas/PRUEBAS.md)): **137 tests unitarios, 27 de integración y 84 casos de smoke
+[PRUEBAS](pruebas/PRUEBAS.md)): **151 tests unitarios, 31 de integración y 84 casos de smoke
 HTTP**, entre ellos las 7 pruebas mínimas de la consigna.
 
 ## Arquitectura
@@ -121,6 +121,15 @@ aceptarlo.
   y una la provocó la propia orquestación. Se descartaron y se fijaron turnos explícitos. El
   push del workflow de CI requería un permiso extra de GitHub; después decidí no usar CI.
 
+## Auditoría final
+
+Antes de entregar auditamos todo el proyecto con GitHub Copilot CLI (seguridad, calidad y
+cumplimiento de la consigna) y dos subagentes como segunda opinión, en solo lectura. Ninguna
+revisión encontró vulnerabilidades de severidad alta o media. Corregí los hallazgos bajos más
+baratos (debug forzado en producción, seed bloqueado en producción, validación de toda la
+configuración, zona horaria de la DB, código muerto, índices y tests más estrictos) y
+documenté el resto ([AUDITORIA-FINAL](auditoria/AUDITORIA-FINAL.md)).
+
 ## Límites conocidos y mejoras pendientes
 
 - El límite por cuenta es por IP + email: rotando direcciones IPv6 se obtienen contadores
@@ -131,6 +140,13 @@ aceptarlo.
 - PHP 8.2 y MySQL 8.0 no tienen verificación automática: todo se probó con PHP 8.5 y
   MariaDB 11.8.
 - En un servidor propio convendría usar `logrotate` en lugar de la rotación del código.
+- El formulario público no tiene límite de frecuencia (solo CSRF): mejora, reutilizar el
+  patrón del límite de login por IP.
+- No hay registro de eventos de seguridad (logins, 429, 419); mejora, una línea de log sin
+  datos personales por evento.
+- En producción conviene un usuario de DB solo con permisos de datos para la app y otro con
+  DDL para el instalador; HSTS desde el servidor HTTPS y vencimiento absoluto de sesión.
+- Refactor de cohesión: extraer la búsqueda de `Solicitud` y la lógica de IP de `Request`.
 
 ---
 

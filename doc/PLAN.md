@@ -412,3 +412,82 @@ implementación, revisión adversarial, corrida oficial del orquestador.
 | A1-13 | AGENTE 1 | R-1, R-2, R-3 (turno de DB) | A2-10 |
 | A2-10 | AGENTE 2 | Tests contra el contrato: `RouteMatcher` puro, dispatch sin hijo, `Database` sin configure, búsqueda FULLTEXT (unit de extracción de palabras + integración con EXPLAIN y casos de borde); `tests/lib` pasa a `bootstrap-cli.php` | A1-13 |
 | A2-11 | AGENTE 2 | Revisión adversarial de A1-13 + corrida | — |
+
+## 7. Funcionalidades finales (pedido de Juan, 2026-10-19, D-63)
+
+Se hacen después de cerrar las correcciones de la auditoría (A1-15/A2-14). Mismo método:
+contrato, pruebas contra el contrato en paralelo, revisión adversarial, corrida oficial.
+
+### F-1 Límite de frecuencia en el formulario público (cierra AU-8)
+
+- Tabla `envios_publicos` (`id`, `ip VARCHAR(45)`, `accion ENUM('solicitud','seguimiento')`,
+  `created_at`; índice `(accion, ip, created_at)` y `(created_at)` para la purga). Mismo
+  patrón "reservar y contar" que el login (D-46): se inserta antes de procesar y se cuenta
+  la ventana incluyendo la fila propia; si supera, se borra la fila propia y **429** +
+  `Retry-After` + re-render del formulario con los valores escapados y el mensaje
+  "Demasiados envíos. Probá de nuevo en N minutos.". Cuenta todo POST que pasó el CSRF
+  (válido o 422). Configurable: `app.form_max_por_ip` (5) y `app.form_ventana_seg` (600),
+  validados como el resto (AU-3). IP con `Request::ip()` (respeta `trusted_proxies`).
+- **Honeypot**: campo `sitio_web` en el formulario, oculto con una clase CSS (sin estilos
+  inline, CSP), `tabindex="-1"`, `autocomplete="off"`, `aria-hidden="true"` en su
+  contenedor y etiqueta "No completar este campo". Si llega con contenido: **no** se guarda
+  nada, se registra el evento (F-2) y se responde igual que un éxito (302 a `/gracias`, con
+  una confirmación genérica sin número ni código), para no darle señal al bot.
+
+### F-2 Registro de eventos de seguridad (cierra AU-9)
+
+- Archivo propio `storage/logs/security.log`, con la misma rotación de `App\Core\Log`
+  (otro canal, mismos límites de config). Una línea por evento:
+  `fecha | evento | ip | método path | admin_id o - | detalle`.
+- Eventos: `login_ok`, `login_fallido`, `login_bloqueado` (429), `csrf_invalido` (419),
+  `acceso_sin_sesion` (302/401 en `/admin`), `form_bloqueado` (429), `honeypot`,
+  `seguimiento_ok`, `seguimiento_fallido`, `seguimiento_bloqueado`, `password_cambiada`,
+  `password_fallida`, `sesion_invalidada`.
+- **Sin datos personales en claro**: nunca contraseñas, códigos de seguimiento, cuerpos ni
+  query strings; el email, si hace falta correlacionar, como los primeros 12 caracteres de su
+  SHA-256 normalizado. La IP sí se registra (dato necesario para seguridad; documentado).
+  Saltos de línea y separadores del detalle neutralizados.
+
+### F-3 Seguimiento público de la solicitud
+
+- Al crear la solicitud se genera un **código de seguimiento** de 128 bits
+  (`random_bytes(16)`), mostrado una sola vez en `/gracias` en un formato legible (por
+  ejemplo grupos de 4 caracteres en base32 sin ambiguos), junto con el número. En la DB se
+  guarda solo `seguimiento_hash CHAR(64)` = SHA-256 del código normalizado; nunca el código.
+  Las solicitudes del seed y las previas tienen `NULL` (no consultables).
+- `GET /seguimiento`: formulario (número + código). `POST /seguimiento` (CSRF como todo
+  POST): busca por id, compara con `hash_equals` contra el hash guardado; si el id no existe,
+  no tiene código o el código no coincide → **el mismo** 422 con "Número o código
+  incorrectos." (sin distinguir casos). Normaliza el código (mayúsculas, sin guiones ni
+  espacios) antes de hashear.
+- Resultado: asunto, estado actual (badge), fecha de alta y última actualización, e
+  historial de estados (fecha, de → a) **sin** nombre del admin ni email del solicitante ni
+  descripción. Se muestra en la respuesta del POST (no se pone el código en la URL ni en la
+  sesión).
+- Fuerza bruta: los intentos **fallidos** cuentan con F-1 (`accion='seguimiento'`):
+  `app.seguimiento_max_por_ip` (10) en `app.seguimiento_ventana_seg` (900) → 429.
+- Link "Consultar el estado de una solicitud" en el sitio público.
+
+### F-5 Cambio de contraseña del admin desde el panel
+
+- `GET/POST /admin/cuenta/password` (auth + CSRF): contraseña actual, nueva y
+  confirmación. Reglas: actual correcta (`password_verify`), nueva ≥ 12 caracteres,
+  `Admin::passwordAcceptable` (≤ 72 bytes, sin NUL), distinta de la actual, confirmación
+  igual. Errores → 422 con mensaje por campo (nunca se re-muestran contraseñas).
+- Intentos con la actual incorrecta cuentan en el límite de login de esa cuenta (IP + email
+  del admin, D-38): al superarlo, 429.
+- Éxito: `Admin::updatePasswordHash`, columna nueva `admins.password_changed_at`,
+  `Session::regenerate()` + `Csrf::rotate()`, flash "Contraseña actualizada." y 302 al panel.
+- **Invalidación de otras sesiones**: la sesión guarda `auth_at` al loguear; `Auth::user()`
+  rechaza la sesión si `auth_at < password_changed_at` (se cierra y se registra
+  `sesion_invalidada`). La sesión que cambió la contraseña actualiza su `auth_at`.
+- Link "Cambiar contraseña" en el header del panel.
+
+### Reparto previsto
+
+| Tarea | Responsable | Contenido |
+|-------|-------------|-----------|
+| A1-16 | AGENTE 1 | F-1, F-2, F-5 (infraestructura de seguridad) |
+| A2-15 | AGENTE 2 | Pruebas contra el contrato de F-1, F-2, F-3, F-5 (en paralelo) |
+| A1-17 | AGENTE 1 | F-3 (seguimiento público) |
+| A2-16 | AGENTE 2 | Revisión adversarial de F-1..F-5 + corrida |
