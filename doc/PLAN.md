@@ -36,6 +36,11 @@ Fuente: consigna "Evaluación Final Integradora — Desafío avanzado" (UTN). En
 - Login exitoso borra los fallos de esa IP + email. Los registros de más de 24 h se purgan
   al registrar un fallo.
 - IP = `REMOTE_ADDR` (no se confía en `X-Forwarded-For`).
+- Precisiones (A2-05, D-41): los intentos bloqueados (429) **no** se registran; con ambos
+  límites alcanzados, `Retry-After` = el mayor; "N minutos" = `ceil(seg/60)`, mínimo 1;
+  normalización del email = `mb_strtolower(trim())`, y la búsqueda del admin en el login
+  compara en forma **binaria** contra ese valor normalizado (las variantes con acento o con
+  otros caracteres equivalentes por collation no autentican ni evitan el límite).
 - El orden de controles no cambia: ruta → CSRF → límite → credenciales (el login no tiene
   `auth`); un POST sin CSRF válido da 419 y no cuenta como intento.
 

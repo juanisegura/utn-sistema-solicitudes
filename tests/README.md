@@ -118,6 +118,10 @@ Columna "Prueba mínima": P1 a P7 corresponden a la consigna (P1 solicitud váli
 | H.13 | filtro ?estado[]=pendiente (array) → 400 sin fugas, no 500 | extra · H |
 | S.7 | POST /admin/logout sin CSRF → 419 y la sesión sigue | extra · S |
 | S.8 | POST /admin/logout con CSRF → 302; después /admin → login | extra · S |
+| L.1 | 5 logins fallidos con un email inexistente de la corrida → 401 c/u; el 6.º → 429 + `Retry-After` entero en [1, 900] + "Demasiados intentos" | extra · L (D-38) |
+| L.4 | 3 POST de login sin CSRF (sin campo, token falso, sin campo) intercalados en la secuencia de L.1 → 419 y no cuentan: el 5.º fallo válido sigue en 401 | extra · L (D-38) |
+| L.2 | con la cuenta de L.1 bloqueada, el admin demo desde la misma IP entra, ve /admin y sale (límite por cuenta, no global) | extra · L (D-38) |
+| L.3 | admin demo: 5 fallos → 401; el 6.º con la password **correcta** → 429 + Retry-After + mensaje; /admin sigue en 302 a login | extra · L (D-38) |
 
 ## Contrato asumido
 
@@ -157,6 +161,22 @@ php scripts/instalar-db.php   # borra y recrea las tablas, y carga el seed
 - Los casos inválidos no crean filas: P2.1 a P2.3, H.3 a H.5, P7.5 y H.12. Tampoco los intentos de login ni de cambio de estado rechazados (P4.x, P6.x).
 - El seed trae sus propias solicitudes, entre ellas una con `<script>`. Por eso P7.2 busca la fila de esta corrida por su marca y no la primera que contenga el payload.
 - La contraseña demo del admin del seed es la que usa `ADMIN_PASSWORD` por defecto (ver "Requisitos y ejecución").
+- **El smoke exige una DB recién reinstalada** (D-38): los intentos fallidos persisten 15 min en `login_intentos` y L.3 deja al admin demo bloqueado desde la IP de la corrida. Una segunda corrida sin reinstalar falla desde P5.1 (login → 429). Si el primer intento de L.1 ya da 429, el script avisa.
+- Presupuesto del límite por IP (20 fallos / 15 min): una corrida registra 13 fallos válidos desde la misma IP (P4.1, P4.2, H.16, 5 de L.1, 5 de L.3); P5.1 y L.2 además borran los del admin. Queda margen aun si los 429 se registraran (serían 15). Agregar casos con logins fallidos exige rehacer esta cuenta.
+
+## Prueba manual del límite por IP (L.5, D-38)
+
+No se automatiza: necesita 21 fallos desde una IP, lo que agota el presupuesto de la IP de la corrida (bloquearía el login del admin para el resto del smoke y para la corrida siguiente), y la app no confía en `X-Forwarded-For`, así que no hay forma de simular otra IP contra el `php -S` de `localhost` (escucha solo en `[::1]`). Procedimiento con un servidor propio en IPv4, usando otras direcciones de loopback como IP de origen:
+
+```bash
+php -S 127.0.0.1:8099 -t public_html public_html/index.php   # en otra terminal
+# 20 fallos con 20 emails distintos desde 127.0.0.11 → 401 c/u; el 21.º (email nuevo) → 429,
+# y también el admin con password correcta desde 127.0.0.11 → 429;
+# el admin desde 127.0.0.12 → 302 (el bloqueo es solo para esa IP).
+curl --interface 127.0.0.11 ...   # mismo flujo que el smoke: GET /admin/login, token, POST
+```
+
+Al terminar, reinstalar la DB.
 
 ## Prueba manual del timeout de sesión (D-21)
 

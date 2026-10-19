@@ -19,6 +19,8 @@ RE_ERR_OBLIGATORIO='obligatori|requerid'
 RE_ERR_EMAIL='(email|correo)[^<]{0,80}v.{1,2}lid|v.{1,2}lid[^<]{0,80}(email|correo)'
 RE_LOGIN_ERROR='Email o contrase.{1,2}a incorrectos'
 RE_FLASH_ESTADO='Estado actualizado'
+RE_BLOQUEO='Demasiados intentos'
+LIMITE_CUENTA=5 VENTANA_SEG=900   # D-38: app.login_max_por_cuenta y ventana de 15 min
 RE_FUGA='SQLSTATE|PDOException|Stack trace|Fatal error|on line [0-9]+|You have an error in your SQL'
 ID_INEXISTENTE=999999999
 
@@ -413,6 +415,81 @@ if ((ADMIN_OK)) && [[ -n $T_ADM ]]; then
 else
   skip "sin sesión de admin o token" S.7 S.8
 fi
+
+seccion "L — Límite de intentos de login (D-38; requiere DB recién reinstalada)"
+# Los fallos persisten 15 min en login_intentos: una segunda corrida sin reinstalar encuentra al
+# admin demo bloqueado por L.3. Presupuesto por IP (límite 20): fallos válidos de toda la corrida
+# = P4.1, P4.2, H.16 + 5 de L.1 + 5 de L.3 = 13 (15 si los 429 también se registraran); P5.1 y
+# L.2 además borran los fallos del admin. L.4 reutiliza la secuencia de L.1 para no gastar 5 más.
+# L.3 bloquea al admin demo: va último y nada posterior necesita loguearse.
+
+# retry_ok → "sí" si el último response trae Retry-After entero en [1, VENTANA_SEG]
+retry_ok() {
+  local ra; ra=$(header Retry-After)
+  [[ $ra =~ ^[0-9]+$ ]] && ((ra >= 1 && ra <= VENTANA_SEG)) && echo sí || echo no
+}
+# fallo_login <jar> <token|''> <email> <password> → deja CODE (sin token: no manda el campo)
+fallo_login() {
+  local jar=$1 tok=$2 email=$3 pass=$4
+  if [[ -n $tok ]]; then
+    post "$jar" /admin/login "$CSRF_FIELD=$tok" "$F_LOGIN_EMAIL=$email" "$F_LOGIN_PASS=$pass"
+  else
+    post "$jar" /admin/login "$F_LOGIN_EMAIL=$email" "$F_LOGIN_PASS=$pass"
+  fi
+}
+
+# L.1 + L.4 — cuenta inexistente propia de la corrida: 4 fallos, 3 POST sin CSRF, 5.º fallo, 6.º
+J_LIM="$TMP_DIR/limite.cookies"; : > "$J_LIM"
+EMAIL_BLOQ="bloqueo-$MARCA@example.com"
+req "$J_LIM" GET /admin/login
+T_LIM=$(csrf_de "$BODY")
+CODES_FALLO=""
+for i in 1 2 3 4; do
+  fallo_login "$J_LIM" "$T_LIM" "$EMAIL_BLOQ" "incorrecta-$i"
+  CODES_FALLO+="$CODE "
+done
+[[ $CODES_FALLO == 429* ]] && echo "AVISO: el primer intento ya da 429 — ¿DB sin reinstalar desde otra corrida?"
+CODES_419=""
+for tok in "" "token-falso-$MARCA" ""; do
+  fallo_login "$J_LIM" "$tok" "$EMAIL_BLOQ" "incorrecta-sincsrf"
+  CODES_419+="$CODE "
+done
+fallo_login "$J_LIM" "$T_LIM" "$EMAIL_BLOQ" "incorrecta-5"
+CODES_FALLO+="$CODE"
+CODE_QUINTO=$CODE
+fallo_login "$J_LIM" "$T_LIM" "$EMAIL_BLOQ" "incorrecta-6"
+check L.1 "5 fallos (email inexistente) → 401 c/u; 6.º → 429 + Retry-After 1..${VENTANA_SEG} + mensaje" \
+  "401 401 401 401 401 429 sí sí" "$CODES_FALLO $CODE $(retry_ok) $(has "$RE_BLOQUEO")"
+check L.4 "3 POST sin CSRF entre los fallos → 419 y no cuentan (el 5.º fallo sigue en 401)" \
+  "419 419 419 401" "$CODES_419$CODE_QUINTO"
+
+# L.2 — con esa cuenta bloqueada, el admin demo desde la misma IP sigue entrando (límite por cuenta)
+nuevo_jar
+req "$J_NUEVO" GET /admin/login
+post "$J_NUEVO" /admin/login "$CSRF_FIELD=$(csrf_de "$BODY")" "$F_LOGIN_EMAIL=$ADMIN_EMAIL" "$F_LOGIN_PASS=$ADMIN_PASSWORD"
+L2="$CODE $(loc)"
+req "$J_NUEVO" GET /admin
+L2+=" $CODE"
+post "$J_NUEVO" /admin/logout "$CSRF_FIELD=$(csrf_de "$BODY")"
+L2+=" $CODE"
+check L.2 "otra cuenta bloqueada no frena al admin demo de la misma IP: login, /admin y logout" \
+  "302 /admin 200 302" "$L2"
+
+# L.3 — admin demo: 5 fallos y el 6.º con la password CORRECTA → 429 sin verificarla
+nuevo_jar
+req "$J_NUEVO" GET /admin/login
+T_L3=$(csrf_de "$BODY")
+CODES_L3=""
+for i in 1 2 3 4 5; do
+  fallo_login "$J_NUEVO" "$T_L3" "$ADMIN_EMAIL" "incorrecta-L3-$i-$MARCA"
+  CODES_L3+="$CODE "
+done
+fallo_login "$J_NUEVO" "$T_L3" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
+CODES_L3+="$CODE $(retry_ok) $(has "$RE_BLOQUEO")"
+req "$J_NUEVO" GET /admin
+check L.3 "admin: 5 fallos → 401; 6.º con password correcta → 429 + Retry-After + mensaje; /admin sigue en login" \
+  "401 401 401 401 401 429 sí sí 302 /admin/login" "$CODES_L3 $CODE $(loc)"
+echo "Nota: el admin demo queda bloqueado ${VENTANA_SEG}s desde esta IP; reinstalar la DB (php scripts/instalar-db.php)."
 
 TOTAL=$((PASS + FAIL + SKIP))
 printf '\nResumen: %d casos — %d PASS, %d FAIL, %d SKIP\n' "$TOTAL" "$PASS" "$FAIL" "$SKIP"
