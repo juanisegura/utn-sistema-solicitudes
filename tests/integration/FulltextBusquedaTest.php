@@ -208,12 +208,12 @@ test('contadores con q coherentes con el listado (M-4 con el mismo filtro)', fun
     }
 });
 
-// D-62 (hallazgo 1 de A2-11, limitación documentada en ADR-0011): InnoDB no indexa tokens de más
+// D-61 (hallazgo 1 de A2-11, limitación documentada en ADR-0011): InnoDB no indexa tokens de más
 // de innodb_ft_max_token_size (84) caracteres. Si la fila tiene una "palabra" más larga (hash, JWT,
 // tramo de URL, base64) y q es su comienzo, el MATCH no la ve: el híbrido da 0 aunque el LIKE la
 // encuentre. Se acepta (reintentar con LIKE volvería inconsistente la semántica de D-56). El caso
 // fija ese comportamiento: si algún día cambia, falla y obliga a revisar la decisión.
-test('token > 84: limitación documentada (D-62): el híbrido no lo encuentra; el LIKE sí', function () {
+test('token > 84: limitación documentada (D-61): el híbrido no lo encuentra; el LIKE sí', function () {
     requiereFulltext();
     $m = marcaFt();
     $largo = $m . str_repeat('ab12', 25);              // 108 caracteres sin separadores
@@ -223,7 +223,7 @@ test('token > 84: limitación documentada (D-62): el híbrido no lo encuentra; e
         $patron = '%' . App\Models\Solicitud::escapeLike($q) . '%';
         $like = (int) valor('SELECT COUNT(*) FROM solicitudes WHERE asunto LIKE ? ESCAPE ?', [$patron, '\\']);
         assertSame(1, $like, 'el LIKE puro sí encuentra la fila');
-        assertSame(0, buscarPanel(adminFt(), $q)[0], 'el híbrido no (token no indexado): si esto cambia, actualizar D-62/ADR-0011');
+        assertSame(0, buscarPanel(adminFt(), $q)[0], 'el híbrido no (token no indexado): si esto cambia, actualizar D-61/ADR-0011');
     } finally {
         borrarFilas($ids);
     }

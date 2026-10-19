@@ -58,7 +58,7 @@ El detalle de cada caso (ID → descripción) está en `tests/README.md`, secci�
 | M-7 tests y corrida local | este documento; `tests/run-all.sh` (no hay CI en GitHub, D-51) |
 | M-8 timeout de sesión | `unit/SessionTimeoutTest.php` |
 
-**Segunda fase de mejoras (R-1..R-3, PLAN §6)**: pruebas escritas contra el contrato (A2-10) y ampliadas en la revisión A2-11; todas en verde en la corrida oficial vigente (137 / 27 / 84). Las 2 regresiones de hallazgos de A2-11 (status sin validar en `HttpException`, variante acentuada de stopword) pasan desde la corrección de A1-14 (d648f11); el prefijo de un token de más de 84 caracteres, que el híbrido no encuentra, queda como **comportamiento documentado** (limitación aceptada en ADR-0011, D-62) y su caso falla si ese comportamiento cambia sin revisar la decisión:
+**Segunda fase de mejoras (R-1..R-3, PLAN §6)**: pruebas escritas contra el contrato (A2-10) y ampliadas en la revisión A2-11; todas en verde en la corrida oficial vigente (137 / 27 / 84). Las 2 regresiones de hallazgos de A2-11 (status sin validar en `HttpException`, variante acentuada de stopword) pasan desde la corrección de A1-14 (d648f11); el prefijo de un token de más de 84 caracteres, que el híbrido no encuentra, queda como **comportamiento documentado** (limitación aceptada en ADR-0011, D-61) y su caso falla si ese comportamiento cambia sin revisar la decisión:
 
 | Mejora | Pruebas |
 |---|---|

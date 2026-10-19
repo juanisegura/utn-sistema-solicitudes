@@ -61,7 +61,7 @@ M-3 y los casos B del smoke (D-55, D-56).
 - Verificado con una prueba diferencial de ~3000 consultas contra el LIKE puro: cero filas
   que el LIKE encuentre desde el inicio de una palabra y el híbrido no, y ninguna fila
   extra. Las 84 pruebas del smoke (casos B incluidos) dan lo mismo.
-- **Limitación aceptada (D-62):** InnoDB no indexa tokens de más de 84 caracteres
+- **Limitación aceptada (D-61):** InnoDB no indexa tokens de más de 84 caracteres
   (`innodb_ft_max_token_size`). Una búsqueda cuyas palabras están dentro de un token así (por
   ejemplo, un hash o una cadena larga sin separadores) no lo encuentra. No se corrige
   reintentando con el LIKE cuando el FULLTEXT no devuelve nada: la misma búsqueda daría
