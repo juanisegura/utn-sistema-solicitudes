@@ -329,11 +329,11 @@ implementación, revisión adversarial, corrida oficial del orquestador.
   `Admin::normalizeEmail`/`passwordAcceptable`, escape de `LIKE` (M-3), rotación (M-6).
 - Integración contra DB (`tests/integration/`, mismo runner, requiere DB de prueba):
   atomicidad del límite (M-1) y transacción del historial (M-2).
-- **CI en GitHub Actions** (`.github/workflows/ci.yml`): matriz PHP **8.2** (versión mínima,
-  valida D-35) y la última estable; servicio **MySQL 8.0** (valida la compatibilidad que hoy
-  solo está probada en MariaDB); pasos: `php -l` de todo, unit, `config.local.php` generado
-  desde variables del workflow (credenciales efímeras del contenedor de CI, no secretos),
-  `instalar-db`, integración, `php -S` en background, `tests/smoke.sh`.
+- **Ejecución local, sin CI en GitHub** (decisión de Juan, D-51): un script
+  `tests/run-all.sh` corre en orden `php -l` de todo, unit, `instalar-db`, integración (con
+  `php -S` de varios workers para probar la concurrencia de M-1) y smoke sobre DB recién
+  reinstalada. La compatibilidad con PHP 8.2 y MySQL 8.0 queda como verificación manual
+  documentada (no se automatiza).
 
 ### M-8 Timeout de sesión automatizado
 
