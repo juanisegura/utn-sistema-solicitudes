@@ -45,9 +45,7 @@ request → public_html/index.php   único DocumentRoot; front controller
   una selección, y reinicié el contexto del revisor antes de la revisión de autenticación.
 - **Arquitectura:** MVC liviano, sin framework ni Composer, con el mismo nivel de los
   sitios que tengo en producción.
-- **Repositorio:** público, con un commit por tarea. Antes de entregar reescribí el
-  historial para que los commits figuren solo con mi autoría
-  ([equivalencia de hashes](ia/MAPEO-COMMITS.md)).
+- **Repositorio:** público, con un commit por tarea.
 - **Alcance:** implementé lo obligatorio y después sumé:
   - el límite de intentos de login;
   - una primera tanda de mejoras: historial, búsqueda y paginación, contadores con
