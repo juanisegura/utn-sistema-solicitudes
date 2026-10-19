@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use InvalidArgumentException;
 
 final class Response
 {
@@ -37,10 +36,7 @@ final class Response
      */
     public static function redirect(string $path, int $status = 302): never
     {
-        // "/\evil.com" o con controles (CR/LF) los navegadores lo pueden interpretar como otro host.
-        if (!str_starts_with($path, '/') || str_starts_with($path, '//') || preg_match('/[\\\\\x00-\x1F\x7F]/', $path) === 1) {
-            throw new InvalidArgumentException('Redirect solo a paths locales.');
-        }
+        // HttpException valida status 3xx y path local en un único lugar (InvalidArgumentException si no).
         throw new HttpException($status, ['Location' => $path]);
     }
 
@@ -54,7 +50,7 @@ final class Response
     public static function send(HttpException $e): void
     {
         if ($e->isRedirect()) {
-            header('Location: ' . $e->headers['Location'], true, $e->status);
+            header('Location: ' . $e->getLocation(), true, $e->status);
 
             return;
         }

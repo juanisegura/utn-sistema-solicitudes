@@ -20,7 +20,10 @@ M-3 y los casos B del smoke (D-55, D-56).
   indexables**: secuencias de letras, marcas y dígitos, de modo que los operadores booleanos
   del usuario nunca llegan a la expresión. Descarta las de menos de 3 o más de 84
   caracteres (`innodb_ft_min_token_size` / `max_token_size`) y las que son prefijo de una
-  stopword (`abo` no está indexado dentro de `about`).
+  stopword (`abo` no está indexado dentro de `about`). La comparación con las stopwords pliega
+  mayúsculas y acentos igual que `utf8mb4_unicode_ci` (`cóm`, `THÉ` o `wás` también se
+  descartan): con la extensión intl usa `Normalizer` (NFD sin marcas); sin intl, una tabla
+  de letras latinas acentuadas.
 - Si el texto buscado contiene `_` o un apóstrofe (`'` o `’`), `fulltextQuery()` devuelve
   `null` y la búsqueda usa solo el `LIKE` (D-59). InnoDB trata el `_` como parte de la
   palabra (`foo_bar` es un único token) y el comportamiento del apóstrofe varía entre
@@ -58,8 +61,21 @@ M-3 y los casos B del smoke (D-55, D-56).
 - Verificado con una prueba diferencial de ~3000 consultas contra el LIKE puro: cero filas
   que el LIKE encuentre desde el inicio de una palabra y el híbrido no, y ninguna fila
   extra. Las 84 pruebas del smoke (casos B incluidos) dan lo mismo.
-- Tokens de más de 84 caracteres no se indexan: una búsqueda que empiece uno de ellos no lo
-  encuentra (caso extremo).
+- **Limitación aceptada (D-62):** InnoDB no indexa tokens de más de 84 caracteres
+  (`innodb_ft_max_token_size`). Una búsqueda cuyas palabras están dentro de un token así (por
+  ejemplo, un hash o una cadena larga sin separadores) no lo encuentra. No se corrige
+  reintentando con el LIKE cuando el FULLTEXT no devuelve nada: la misma búsqueda daría
+  resultados de semántica distinta según haya o no otras coincidencias (por palabra en un
+  caso, por subcadena en el otro), y eso es más confuso que la limitación. En un servidor
+  propio se puede subir `innodb_ft_max_token_size` (y reconstruir el índice) y ajustar
+  `FT_MAX` en `Solicitud`.
+- Texto sin espacios en escrituras CJK (chino, japonés): el parser por defecto toma cada
+  corrida sin separadores como una sola palabra, así que solo se encuentra por su comienzo.
+- Las formas Unicode NFC y NFD de un mismo texto ("é" precompuesta o "e" + acento combinado)
+  no se normalizan al guardar ni al buscar. La collation las iguala con `=`, pero el `LIKE` no
+  es simétrico (verificado en MariaDB 11.8): una búsqueda escrita en NFD no encuentra un texto
+  guardado en NFC, aunque al revés sí. La limitación ya existía con el LIKE, antes de R-1.
+  Mejora posible: normalizar a NFC (`Normalizer`) al guardar y al buscar.
 - InnoDB aplica los cambios del índice FULLTEXT al confirmar la transacción: una fila
   recién insertada y todavía no confirmada no aparece en la búsqueda (con autocommit no se
   nota).

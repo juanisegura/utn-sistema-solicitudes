@@ -120,9 +120,24 @@ final class Solicitud
         return $terminos === [] ? null : implode(' ', array_keys($terminos));
     }
 
+    /**
+     * Letras latinas acentuadas → base, para plegar sin la extensión intl. Cubre lo que el
+     * formulario puede recibir en castellano y lenguas vecinas; con intl se usa Normalizer.
+     */
+    private const SIN_ACENTOS = [
+        'á' => 'a', 'à' => 'a', 'ä' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
+        'é' => 'e', 'è' => 'e', 'ë' => 'e', 'ê' => 'e',
+        'í' => 'i', 'ì' => 'i', 'ï' => 'i', 'î' => 'i',
+        'ó' => 'o', 'ò' => 'o', 'ö' => 'o', 'ô' => 'o', 'õ' => 'o',
+        'ú' => 'u', 'ù' => 'u', 'ü' => 'u', 'û' => 'u',
+        'ñ' => 'n', 'ç' => 'c', 'ý' => 'y', 'ÿ' => 'y',
+    ];
+
     private static function esPrefijoDeStopword(string $palabra): bool
     {
-        $palabra = mb_strtolower($palabra, 'UTF-8');
+        // Mismo plegado que utf8mb4_unicode_ci (sin mayúsculas ni acentos): "cóm" o "THÉ" tampoco
+        // están indexadas dentro de "com"/"the" (A2-11, hallazgo 2).
+        $palabra = self::plegar($palabra);
         foreach (self::FT_STOPWORDS as $stopword) {
             if (str_starts_with($stopword, $palabra)) {
                 return true;
@@ -130,6 +145,25 @@ final class Solicitud
         }
 
         return false;
+    }
+
+    /** Minúsculas y sin diacríticos: NFD + quitar marcas si hay intl; si no, la tabla SIN_ACENTOS. */
+    private static function plegar(string $texto): string
+    {
+        $texto = mb_strtolower($texto, 'UTF-8');
+        if (class_exists(\Normalizer::class)) {
+            $nfd = \Normalizer::normalize($texto, \Normalizer::FORM_D);
+            if ($nfd !== false) {
+                return (string) preg_replace('/\p{Mn}+/u', '', $nfd);
+            }
+        }
+
+        return self::plegarSinIntl($texto);
+    }
+
+    private static function plegarSinIntl(string $texto): string
+    {
+        return strtr(mb_strtolower($texto, 'UTF-8'), self::SIN_ACENTOS);
     }
 
     /**
