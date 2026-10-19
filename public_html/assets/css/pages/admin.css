@@ -48,6 +48,8 @@
 .meta > div:first-child { padding-top: 0; }
 .meta dt { color: var(--ink-3); font-size: var(--fs-sm); }
 .meta dd { margin: 0; }
+/* Email: corta en el <wbr> antes de la "@"; solo parte una palabra si sola no entra. */
+.meta dd.break { overflow-wrap: break-word; }
 .estado-form { margin-top: 0; }
 .estado-form .btn { width: 100%; }
 

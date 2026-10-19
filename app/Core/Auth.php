@@ -41,14 +41,17 @@ final class Auth
         }
 
         $id = (int) $admin['id'];
-        // Nuevo ID de sesión y nuevo token CSRF: lo que se haya obtenido como invitado deja de servir.
-        Session::regenerate();
-        Csrf::rotate();
-        Session::set(self::SESSION_KEY, $id);
+        // Efectos en la DB antes de fijar la sesión (D-53): si alguno falla, la request termina en
+        // 500 sin dejar una sesión autenticada a medias.
         Admin::touchLastLogin($id);
         if (Admin::needsRehash($hash)) {
             Admin::updatePasswordHash($id, $password);
         }
+        // Nuevo ID de sesión y nuevo token CSRF: lo que se haya obtenido como invitado deja de servir.
+        // El admin_id se escribe último: es lo que vuelve autenticada a la sesión.
+        Session::regenerate();
+        Csrf::rotate();
+        Session::set(self::SESSION_KEY, $id);
 
         return true;
     }

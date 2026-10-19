@@ -5,6 +5,7 @@ declare(strict_types=1);
 // Arranque de cada request web: errores, log, config y headers de seguridad. La sesión la abre
 // el Router cuando la ruta existe (M-5). Los scripts CLI no pasan por acá: usan solo app/autoload.php.
 
+use App\Core\Config;
 use App\Core\Database;
 use App\Core\Log;
 use App\Core\LoginThrottle;
@@ -105,6 +106,7 @@ header('X-Frame-Options: DENY');
 header('Referrer-Policy: same-origin');
 
 $config = require __DIR__ . '/config/config.php';
+Config::configure($config);
 $debug = $config['app']['debug'];
 ini_set('display_errors', $debug ? '1' : '0');
 

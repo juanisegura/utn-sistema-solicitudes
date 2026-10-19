@@ -12,6 +12,7 @@ return [
         // 'trusted_proxies'  => ['10.0.0.0/8'], // solo si hay un proxy/CDN propio delante
         // 'log_max_bytes'    => 1048576,        // rotación de storage/logs/app.log
         // 'log_max_archivos' => 5,
+        // 'por_pagina'       => 20,             // solicitudes por página en el panel
     ],
     'db' => [
         'host'    => '127.0.0.1',

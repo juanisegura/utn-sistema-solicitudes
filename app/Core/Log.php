@@ -39,7 +39,13 @@ final class Log
             return;
         }
         try {
-            self::rotateIfNeeded($file);
+            try {
+                self::rotateIfNeeded($file);
+            } catch (\Throwable) {
+                // D-53: write() corre dentro del exception handler; si la rotación falla (permisos,
+                // disco, un directorio donde iría .1) se sigue escribiendo en el archivo actual.
+                // Lanzar acá perdería el error original y la página 500.
+            }
             if (@file_put_contents($file, $line, FILE_APPEND) === false) {
                 error_log($line);
             }

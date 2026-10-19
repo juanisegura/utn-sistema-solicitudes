@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Admin;
 
 use App\Core\Auth;
+use App\Core\Config;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
@@ -154,19 +155,10 @@ final class SolicitudAdminController
         ];
     }
 
-    /**
-     * app.por_pagina. No hay un servicio de config inyectable (fuera del alcance de M-3): se lee
-     * una vez por request de la config ya validada por bootstrap.
-     */
+    /** app.por_pagina (M-3), de la config cargada por bootstrap. */
     private static function porPagina(): int
     {
-        static $n = null;
-        if ($n === null) {
-            $config = require dirname(__DIR__, 2) . '/config/config.php';
-            $n = max(1, (int) ($config['app']['por_pagina'] ?? 20));
-        }
-
-        return $n;
+        return max(1, (int) Config::get('app.por_pagina', 20));
     }
 
     /** @param array<string, mixed> $solicitud */
@@ -199,6 +191,9 @@ final class SolicitudAdminController
         $fila['estado_enum'] = Estado::from($fila['estado']);
         $fila['creada'] = self::fecha($fila['created_at']);
         $fila['actualizada'] = self::fecha($fila['updated_at']);
+        // Tramos para cortar un email largo en puntos legibles (antes de "@" y después de cada "."),
+        // no en cualquier letra. La vista los une con <wbr>.
+        $fila['email_tramos'] = preg_split('/(?=@)|(?<=\.)/', $fila['email'], -1, PREG_SPLIT_NO_EMPTY);
 
         return $fila;
     }

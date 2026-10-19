@@ -76,7 +76,7 @@ final class Solicitud
 
     /**
      * Escapa los comodines de LIKE para que el texto se busque literal: "100%_ok" no debe
-     * coincidir con cualquier cosa. Se usa con ESCAPE '\' en la consulta. Función pura.
+     * coincidir con cualquier cosa. Se usa con `ESCAPE ?` ("\" bindeado) en la consulta. Función pura.
      */
     public static function escapeLike(string $texto): string
     {
@@ -141,8 +141,11 @@ final class Solicitud
             $patron = '%' . self::escapeLike($q) . '%';
             $partes = [];
             foreach (self::BUSCABLES as $columna) {
-                $partes[] = "{$columna} LIKE ? ESCAPE '\\\\'";
+                // ESCAPE bindeado (D-53): un literal '\\' cambia de significado si el sql_mode de la
+                // sesión incluye NO_BACKSLASH_ESCAPES; como parámetro siempre es un solo "\".
+                $partes[] = "{$columna} LIKE ? ESCAPE ?";
                 $params[] = $patron;
+                $params[] = '\\';
             }
             $condiciones[] = '(' . implode(' OR ', $partes) . ')';
         }

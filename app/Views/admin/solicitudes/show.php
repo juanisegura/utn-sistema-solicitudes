@@ -50,7 +50,7 @@ use App\Core\Csrf;
         <dl class="meta">
             <div><dt>Estado</dt><dd><span class="badge badge-<?= e($solicitud['estado_enum']->value) ?>"><?= e($solicitud['estado_enum']->label()) ?></span></dd></div>
             <div><dt>Solicitante</dt><dd><?= e($solicitud['nombre']) ?></dd></div>
-            <div><dt>Email</dt><dd class="break"><?= e($solicitud['email']) ?></dd></div>
+            <div><dt>Email</dt><dd class="break"><?= implode('<wbr>', array_map('e', $solicitud['email_tramos'])) /* cada tramo escapado; <wbr> es markup propio */ ?></dd></div>
             <div><dt>Recibida</dt><dd class="num"><?= e($solicitud['creada']) ?></dd></div>
             <div><dt>Última actualización</dt><dd class="num"><?= e($solicitud['actualizada']) ?></dd></div>
         </dl>

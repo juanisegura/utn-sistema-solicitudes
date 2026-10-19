@@ -47,7 +47,14 @@ final class AuthController
         }
 
         if (Auth::attempt($email, $password)) {
-            LoginThrottle::exito($intento, $ip, $email);
+            try {
+                LoginThrottle::exito($intento, $ip, $email);
+            } catch (\Throwable $e) {
+                // La sesión ya quedó autenticada: si la limpieza falla, no se responde 500 con
+                // sesión válida (D-53). Se cierra y la excepción sigue al handler (log + 500).
+                Auth::logout();
+                throw $e;
+            }
             Response::redirect('/admin');
         }
 
@@ -69,7 +76,7 @@ final class AuthController
     {
         Response::html(View::render('admin/login', [
             'title' => 'Ingreso al panel',
-            'email' => trim($email),
+            'email' => mb_substr(trim($email), 0, 254, 'UTF-8'), // D-53: tope, como el campo
             'error' => $error,
             'admin' => null,
         ], 'layouts/admin'), $status, $headers);

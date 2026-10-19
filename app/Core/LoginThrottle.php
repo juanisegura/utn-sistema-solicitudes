@@ -16,14 +16,23 @@ final class LoginThrottle
     /** @var array{cuenta: int, ip: int, ventana: int}|null */
     private static ?array $limites = null;
 
-    /** @param array<string, mixed> $app sección 'app' de la config (si no, se lee config.php) */
+    /**
+     * Límites y ventana deben ser enteros > 0 (D-53): una ventana de 0 apagaría el límite y un
+     * máximo no numérico (→ 0) bloquearía a todos. Config inválida → error visible al arrancar.
+     *
+     * @param array<string, mixed> $app sección 'app' de la config (si no se llama, se toma de Config)
+     */
     public static function configure(array $app): void
     {
-        self::$limites = [
-            'cuenta'  => (int) $app['login_max_por_cuenta'],
-            'ip'      => (int) $app['login_max_por_ip'],
-            'ventana' => (int) $app['login_ventana_seg'],
-        ];
+        $limites = [];
+        foreach (['cuenta' => 'login_max_por_cuenta', 'ip' => 'login_max_por_ip', 'ventana' => 'login_ventana_seg'] as $clave => $nombre) {
+            $valor = filter_var($app[$nombre] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($valor === false) {
+                throw new \InvalidArgumentException("app.{$nombre} debe ser un entero mayor que 0.");
+            }
+            $limites[$clave] = $valor;
+        }
+        self::$limites = $limites;
     }
 
     /**
@@ -80,8 +89,7 @@ final class LoginThrottle
     private static function limites(): array
     {
         if (self::$limites === null) {
-            $config = require dirname(__DIR__) . '/config/config.php';
-            self::configure($config['app']);
+            self::configure(Config::get('app', [])); // sin Config inicializada: LogicException clara
         }
 
         return self::$limites;
