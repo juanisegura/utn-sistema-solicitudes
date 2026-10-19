@@ -1,9 +1,11 @@
 <?php
 /** Página de error 400. Texto fijo: no muestra datos de la request. */
 ?>
-<section class="card card-error">
-    <p class="error-code">400</p>
-    <h1>Solicitud inválida</h1>
-    <p>Los datos enviados no tienen un formato válido.</p>
-    <p><a class="btn" href="/">Volver al inicio</a></p>
-</section>
+<div class="split split-error">
+    <p class="error-code" aria-hidden="true">400</p>
+    <section class="split-main">
+        <h1 class="display">Solicitud inválida</h1>
+        <p class="lead">Los datos enviados no tienen un formato válido. Revisá la dirección o el formulario e intentá de nuevo.</p>
+        <p><a class="btn" href="/">Ir al inicio</a></p>
+    </section>
+</div>

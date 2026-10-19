@@ -1,0 +1,10 @@
+/* Badges de estado: tono semántico + punto en currentColor. */
+.badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .15rem .6rem .15rem .5rem; border-radius: 999px;
+  font-size: var(--fs-xs); font-weight: 600; white-space: nowrap;
+}
+.badge::before { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: currentColor; }
+.badge-pendiente  { color: var(--pend-fg); background: var(--pend-bg); }
+.badge-en_proceso { color: var(--proc-fg); background: var(--proc-bg); }
+.badge-resuelta   { color: var(--res-fg);  background: var(--res-bg); }

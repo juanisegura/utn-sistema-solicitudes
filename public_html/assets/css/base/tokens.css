@@ -1,0 +1,56 @@
+/* Tokens de diseño: color (hex con override OKLCH), tipografía, espaciado y medidas. */
+:root {
+  --paper: #F5F7F8;
+  --surface: #FFFFFF;
+  --ink: #17212B;          /* 15.2:1 sobre --paper */
+  --ink-2: #4D5966;        /* 6.7:1 */
+  --ink-3: #5F6B77;        /* 5.1:1 */
+  --line: #DDE3E8;         /* hairline decorativa */
+  --line-strong: #7C8894;  /* bordes de controles: 3.4:1 sobre papel, 3.6:1 sobre blanco */
+  --accent: #0E6B70;       /* 5.8:1 sobre papel; blanco sobre acento 6.3:1 */
+  --accent-hover: #0A5559;
+  --accent-weak: #E2F0F0;
+
+  --pend-fg: #7A4E00; --pend-bg: #FBEFD5; --pend-dot: #C98A12;   /* 6.3:1 */
+  --proc-fg: #1C4A9C; --proc-bg: #E3EBFA; --proc-dot: #3B6FD1;   /* 7.0:1 */
+  --res-fg: #1D6337;  --res-bg: #E0F2E6;  --res-dot: #2F9A57;    /* 6.2:1 */
+  --err-fg: #A3231B;  --err-bg: #FCEBEA;                          /* 6.5:1 */
+
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Escala tipográfica ~1.25 */
+  --fs-xs: .8125rem;
+  --fs-sm: .875rem;
+  --fs-base: 1rem;
+  --fs-md: 1.125rem;
+  --fs-lg: 1.375rem;
+  --fs-xl: 1.75rem;
+  --fs-display: clamp(2rem, 1.35rem + 2.4vw, 3.125rem);
+
+  --space-1: .25rem; --space-2: .5rem; --space-3: .75rem; --space-4: 1rem;
+  --space-5: 1.5rem; --space-6: 2rem;  --space-7: 3rem;   --space-8: 4.5rem;
+
+  --gutter: clamp(16px, 4vw, 40px);
+  --radius: 6px;
+  --control-h: 44px;
+  --header-h: 60px;
+}
+
+@supports (color: oklch(0% 0 0)) {
+  :root {
+    --paper: oklch(97.5% 0.003 229);
+    --ink: oklch(24.3% 0.024 249);
+    --ink-2: oklch(45.9% 0.026 250);
+    --ink-3: oklch(52.2% 0.024 248);
+    --line: oklch(91.3% 0.009 243);
+    --line-strong: oklch(62.1% 0.023 248);
+    --accent: oklch(48.2% 0.078 201);
+    --accent-hover: oklch(41% 0.066 201);
+    --accent-weak: oklch(94.5% 0.015 197);
+    --pend-fg: oklch(46.2% 0.099 72);  --pend-bg: oklch(95.5% 0.036 86);  --pend-dot: oklch(68% 0.139 75);
+    --proc-fg: oklch(42.8% 0.143 261); --proc-bg: oklch(93.8% 0.022 263); --proc-dot: oklch(55.8% 0.161 262);
+    --res-fg: oklch(44.5% 0.1 152);    --res-bg: oklch(94.5% 0.025 157);  --res-dot: oklch(60.9% 0.139 152);
+    --err-fg: oklch(46.9% 0.165 29);   --err-bg: oklch(95.3% 0.019 22);
+  }
+}

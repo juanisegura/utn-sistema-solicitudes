@@ -1,0 +1,4 @@
+/* Login: la columna del formulario no se estira a todo el ancho disponible. */
+@media (min-width: 960px) {
+  .split-narrow > * { max-width: 30rem; }
+}

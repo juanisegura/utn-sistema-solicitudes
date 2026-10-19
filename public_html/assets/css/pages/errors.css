@@ -1,0 +1,14 @@
+/* Páginas de error (400–500): código grande decorativo junto al mensaje. */
+.error-code {
+  margin: 0; font-size: clamp(4.5rem, 3rem + 7vw, 9rem); font-weight: 700; line-height: .9;
+  letter-spacing: -.05em; color: var(--line); font-variant-numeric: tabular-nums;
+}
+pre.debug {
+  margin: 0 0 var(--space-5); padding: var(--space-3) var(--space-4); overflow-x: auto;
+  font: var(--fs-sm)/1.5 var(--mono); background: var(--surface); border-left: 3px solid var(--err-fg);
+}
+
+@media (min-width: 960px) {
+  .split-error { align-items: center; }
+  .split-error .error-code { padding-right: var(--space-8); }
+}

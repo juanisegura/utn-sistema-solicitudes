@@ -1,0 +1,14 @@
+/* Botones: neutro, primario (acento) y discreto. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  min-height: var(--control-h); padding: .55rem 1.15rem;
+  font: inherit; font-weight: 600; line-height: 1.2;
+  color: var(--ink); background: transparent;
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  text-decoration: none; cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.btn:hover { background: var(--surface); border-color: var(--ink-2); color: var(--ink); text-decoration: none; }
+.btn-primary { color: #fff; background: var(--accent); border-color: var(--accent); }
+.btn-primary:hover { color: #fff; background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-quiet { min-height: 40px; padding: .4rem .85rem; font-size: var(--fs-sm); }

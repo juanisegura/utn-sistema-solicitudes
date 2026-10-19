@@ -1,0 +1,7 @@
+/* Avisos: franja con regla lateral, no caja flotante. */
+.alert { margin: 0 0 var(--space-5); padding: var(--space-3) var(--space-4); border-left: 3px solid; border-radius: 0 var(--radius) var(--radius) 0; }
+.alert p { margin: 0; }
+.alert ul { margin: var(--space-2) 0 0; padding-left: 1.2rem; }
+.alert-error { color: var(--err-fg); background: var(--err-bg); }
+.alert-error a { color: var(--err-fg); }
+.alert-success { color: var(--res-fg); background: var(--res-bg); }

@@ -1,0 +1,31 @@
+/* Formulario público y confirmación: recorrido de estados y número de solicitud. */
+.steps { list-style: none; margin: var(--space-5) 0 0; padding: 0; counter-reset: paso; }
+.step {
+  --dot: var(--line-strong);
+  position: relative; counter-increment: paso;
+  display: grid; gap: .15rem;
+  padding: 0 0 var(--space-5) 2.75rem;
+}
+.step::before {   /* número del paso sobre el color del estado */
+  content: counter(paso);
+  position: absolute; left: 0; top: -.1rem;
+  width: 1.85rem; height: 1.85rem; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: var(--fs-sm); font-weight: 650; color: #fff; background: var(--dot);
+  font-variant-numeric: tabular-nums;
+}
+.step:not(:last-child)::after {   /* riel que une los pasos */
+  content: ""; position: absolute; left: calc(.925rem - 1px); top: 1.95rem; bottom: .25rem;
+  width: 2px; background: var(--line);
+}
+.step-pendiente  { --dot: var(--pend-dot); }
+.step-en_proceso { --dot: var(--proc-dot); }
+.step-resuelta   { --dot: var(--res-dot); }
+.step-name { font-weight: 650; }
+.step-text { color: var(--ink-2); font-size: var(--fs-sm); max-width: 40ch; }
+.step-now { font-weight: 500; color: var(--ink-3); }
+.step[aria-current="step"]::before { box-shadow: 0 0 0 4px var(--paper), 0 0 0 6px var(--dot); }
+
+.ticket { margin: var(--space-6) 0; display: grid; gap: .1rem; }
+.ticket-label { font-size: var(--fs-sm); color: var(--ink-2); }
+.ticket strong { font-variant-numeric: tabular-nums; font-size: clamp(2.75rem, 2rem + 3vw, 4.5rem); line-height: 1; letter-spacing: -.03em; color: var(--accent); }

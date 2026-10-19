@@ -98,7 +98,7 @@ app/
 public_html/
 ├── index.php                # front controller (y router de php -S para estáticos)
 ├── .htaccess                # rewrite al front controller + headers de seguridad
-└── assets/css/app.css
+└── assets/css/               # base/ · layout/ · components/ · pages/ (D-43, un <link> por hoja según layout)
 database/  schema.sql · seed.sql
 scripts/   instalar-db.php (schema + seed; guarda en producción) · crear-admin.php (CLI, password oculta)
 tests/     smoke.sh (67 casos por HTTP: 7 pruebas mínimas + códigos, sesión, CSRF) · README.md

@@ -7,7 +7,7 @@
  */
 use App\Core\Csrf;
 ?>
-<p><a href="/admin">← Volver al listado</a></p>
+<p class="back"><a href="/admin">Volver al listado</a></p>
 
 <?php if ($flash !== null): ?>
     <div class="alert alert-success" role="status"><p><?= e($flash) ?></p></div>
@@ -16,37 +16,35 @@ use App\Core\Csrf;
     <div class="alert alert-error" role="alert"><p><?= e($error) ?></p></div>
 <?php endif; ?>
 
-<article class="card">
-    <header class="detail-header">
-        <h1>Solicitud #<?= e($solicitud['id']) ?></h1>
-        <span class="badge badge-<?= e($solicitud['estado_enum']->value) ?>"><?= e($solicitud['estado_enum']->label()) ?></span>
-    </header>
+<div class="detail">
+    <article class="detail-main">
+        <p class="detail-ref">Solicitud #<?= e($solicitud['id']) ?></p>
+        <h1 class="detail-title"><?= e($solicitud['asunto']) ?></h1>
+        <div class="prose prewrap"><?= e($solicitud['descripcion']) ?></div>
+    </article>
 
-    <dl class="detail">
-        <dt>Asunto</dt>
-        <dd><?= e($solicitud['asunto']) ?></dd>
-        <dt>Solicitante</dt>
-        <dd><?= e($solicitud['nombre']) ?> · <?= e($solicitud['email']) ?></dd>
-        <dt>Creada</dt>
-        <dd><?= e($solicitud['creada']) ?></dd>
-        <dt>Última actualización</dt>
-        <dd><?= e($solicitud['actualizada']) ?></dd>
-        <dt>Descripción</dt>
-        <dd class="prewrap"><?= e($solicitud['descripcion']) ?></dd>
-    </dl>
+    <aside class="detail-side" aria-label="Datos y estado de la solicitud">
+        <dl class="meta">
+            <div><dt>Estado</dt><dd><span class="badge badge-<?= e($solicitud['estado_enum']->value) ?>"><?= e($solicitud['estado_enum']->label()) ?></span></dd></div>
+            <div><dt>Solicitante</dt><dd><?= e($solicitud['nombre']) ?></dd></div>
+            <div><dt>Email</dt><dd class="break"><?= e($solicitud['email']) ?></dd></div>
+            <div><dt>Recibida</dt><dd class="num"><?= e($solicitud['creada']) ?></dd></div>
+            <div><dt>Última actualización</dt><dd class="num"><?= e($solicitud['actualizada']) ?></dd></div>
+        </dl>
 
-    <form method="post" action="/admin/solicitudes/<?= e($solicitud['id']) ?>/estado" class="form form-inline">
-        <?= Csrf::field() ?>
-        <div class="field">
-            <label for="estado">Cambiar estado</label>
-            <select id="estado" name="estado">
-                <?php foreach ($estados as $estado): ?>
-                    <option value="<?= e($estado->value) ?>"<?= $estado === $solicitud['estado_enum'] ? ' selected' : '' ?>><?= e($estado->label()) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Guardar</button>
-        </div>
-    </form>
-</article>
+        <form method="post" action="/admin/solicitudes/<?= e($solicitud['id']) ?>/estado" class="form estado-form">
+            <?= Csrf::field() ?>
+            <div class="field">
+                <label for="estado">Cambiar estado</label>
+                <select id="estado" name="estado">
+                    <?php foreach ($estados as $estado): ?>
+                        <option value="<?= e($estado->value) ?>"<?= $estado === $solicitud['estado_enum'] ? ' selected' : '' ?>><?= e($estado->label()) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Guardar estado</button>
+            </div>
+        </form>
+    </aside>
+</div>

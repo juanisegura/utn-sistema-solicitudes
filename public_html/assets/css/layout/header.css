@@ -1,0 +1,32 @@
+/* Header sticky translúcido (blur con fallback sólido), marca y sesión del admin. */
+.site-header {
+  position: sticky; top: 0; z-index: 10;
+  background: rgb(245 247 248 / .96);
+  border-bottom: 1px solid var(--line);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .site-header {
+    background: rgb(245 247 248 / .72);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    backdrop-filter: saturate(1.4) blur(14px);
+  }
+}
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: var(--header-h); }
+.brand { display: inline-flex; align-items: center; gap: .6rem; font-weight: 650; color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
+.brand:hover { color: var(--ink); }
+.brand-mark { display: inline-flex; align-items: flex-end; gap: 3px; height: 18px; }
+.brand-mark span { width: 4px; border-radius: 1px; }
+.brand-mark span:nth-child(1) { height: 8px;  background: var(--pend-dot); }
+.brand-mark span:nth-child(2) { height: 13px; background: var(--proc-dot); }
+.brand-mark span:nth-child(3) { height: 18px; background: var(--res-dot); }
+.header-link { font-size: var(--fs-sm); color: var(--ink-2); text-decoration: none; padding: .6rem 0; }
+.header-link:hover { color: var(--ink); text-decoration: underline; }
+.session-box { display: flex; align-items: center; gap: var(--space-3); }
+.session-user { font-size: var(--fs-sm); color: var(--ink-2); }
+.inline-form { margin: 0; }
+/* Mobile: una sola línea; el nombre del admin se omite (el botón de salir alcanza). */
+.brand { white-space: nowrap; }
+@media (max-width: 479px) {
+  .session-user { display: none; }
+}
+

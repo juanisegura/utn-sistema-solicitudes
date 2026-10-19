@@ -32,6 +32,8 @@ request
 
 Solo `public_html/` es DocumentRoot; el resto del código y la config quedan fuera de alcance por URL.
 
+Presentación: CSS propio sin frameworks ni JS, dividido por responsabilidad en `public_html/assets/css/` (base, layout, components, pages) y cargado por cada layout con `<link>` en orden de cascada, sin `@import` ni build step. Mobile first, paleta clara con tokens OKLCH y fallback hex, contraste AA verificado (texto principal 15,2:1, acento 5,8:1, badges ≥ 6,2:1) y nada inline, compatible con la CSP `default-src 'self'` (D-40, D-43).
+
 ## Base de datos
 
 Definida en [database/schema.sql](../database/schema.sql), con tres tablas:

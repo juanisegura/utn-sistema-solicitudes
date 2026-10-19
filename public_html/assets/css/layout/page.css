@@ -1,0 +1,24 @@
+/* Grilla de página: contenedor, columnas separadas por hairline, títulos de página y footer. */
+.wrap { width: 100%; max-width: 1240px; margin-inline: auto; padding-inline: var(--gutter); }
+.page { padding-block: var(--space-6) var(--space-8); }
+
+.site-footer { border-top: 1px solid var(--line); color: var(--ink-3); font-size: var(--fs-sm); }
+.site-footer p { margin: 0; padding-block: var(--space-5); }
+
+/* Dos columnas separadas por una hairline vertical: intro | contenido principal. */
+.split { display: grid; gap: var(--space-6); }
+.split-intro { max-width: 34rem; }
+.split-main { min-width: 0; }
+
+.display { font-size: var(--fs-display); letter-spacing: -.025em; line-height: 1.08; max-width: 16ch; margin-bottom: var(--space-5); }
+.lead { font-size: var(--fs-md); color: var(--ink-2); max-width: 46ch; }
+.section-title { font-size: var(--fs-lg); margin-bottom: var(--space-2); }
+.hint, .note { color: var(--ink-3); font-size: var(--fs-sm); }
+.note { margin-top: var(--space-5); max-width: 44ch; }
+
+@media (min-width: 960px) {
+  .page { padding-block: var(--space-8); }
+  .split { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 0; align-items: start; }
+  .split-intro { padding-right: var(--space-8); }
+  .split-main { padding-left: var(--space-8); border-left: 1px solid var(--line); min-height: 100%; }
+}

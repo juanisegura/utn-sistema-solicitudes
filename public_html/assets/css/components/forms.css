@@ -1,0 +1,28 @@
+/* Campos, labels, errores por campo y grilla del formulario. */
+.form { margin-top: var(--space-5); }
+.form-grid { display: grid; gap: 0 var(--space-5); }
+.field { margin-bottom: var(--space-5); min-width: 0; }
+.field label { display: block; font-weight: 600; font-size: var(--fs-sm); margin-bottom: .4rem; }
+.field input, .field textarea, .field select {
+  display: block; width: 100%;
+  min-height: var(--control-h);
+  padding: .6rem .8rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.field textarea { resize: vertical; min-height: 10rem; line-height: 1.5; }
+.field input:hover, .field textarea:hover, .field select:hover { border-color: var(--ink-2); }
+.field input:focus-visible, .field textarea:focus-visible, .field select:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgb(14 107 112 / .28);
+}
+.field.has-error input, .field.has-error textarea,
+[aria-invalid="true"] { border-color: var(--err-fg); border-width: 2px; padding: calc(.6rem - 1px) calc(.8rem - 1px); }
+.field-error { color: var(--err-fg); font-size: var(--fs-sm); margin: .4rem 0 0; }
+.form-actions { margin-top: var(--space-2); }
+
+@media (min-width: 640px) {
+  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field-full { grid-column: 1 / -1; }
+}
