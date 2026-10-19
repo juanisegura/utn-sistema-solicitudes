@@ -34,6 +34,7 @@ Las columnas "Resultado obtenido" y "Evidencia" se completan al ejecutar contra 
 | Orden del listado (F5) | F5.1 | Listado ordenado por created_at DESC: la solicitud más nueva aparece primero (D-20) | | |
 | Entrada malformada: UTF-8 inválido (H.14) y espacios Unicode (P2.5) | H.14, P2.5 | 422, nunca 500 ni alta | | |
 | Archivos ocultos bajo php -S (H.15) | H.15 | GET /.htaccess → 403/404 | | |
+| Password con NUL (H.16) | H.16 | password correcta + %00 + sufijo en el login → 401 y /admin sigue en 302 (bcrypt ignora lo que sigue al NUL) | | |
 | Parámetros como array (H.12, H.13, P6.8) | H.12, H.13, P6.8 | nombre[] en el formulario público 422 (H.12); ?estado[] 400 (H.13); estado[] en el cambio de estado 422 (P6.8); sin fugas de error ni 500 | | |
 
 ## Pruebas manuales (navegador)
@@ -46,6 +47,13 @@ El script no cubre los siguientes puntos:
 - [ ] Mensajes de error junto a cada campo inválido.
 - [ ] Timeout de sesión por inactividad (D-21): procedimiento en `tests/README.md`, sección "Prueba manual del timeout de sesión (D-21)", bajando `app.session_timeout` en la config local.
 
+Verificado a mano en A2-04 (curl + snippets PHP que cargan la app; no automatizable sin acceso a la DB/sesiones desde el smoke):
+
+- [x] Admin desactivado (`activo=0`) con sesión viva: GET /admin → 302 a login, POST de estado → 401; login con credenciales correctas → 401 con el mensaje genérico. Al reactivarlo la sesión vieja no recupera el acceso.
+- [x] Timeout de inactividad simulado editando `_last_activity` del archivo de sesión (ver `tests/README.md`): 1700 s → 200; 1801 s → 302 a login, ID de sesión nuevo; POST con el token previo → 401 sin cambio.
+- [x] Fijación: cookie `utn_sesion` inventada → el servidor emite un ID nuevo (use_strict_mode); la cookie de invitado deja de valer tras el login y la autenticada tras el logout (302 a login).
+- [x] Respuestas con sesión llevan `Cache-Control: no-store, no-cache, must-revalidate` (cache_limiter de PHP): "Atrás" tras logout no muestra datos cacheados.
+
 Comportamiento con JavaScript deshabilitado: no aplica, la aplicación no usa JS.
 
 ## Corridas
@@ -53,3 +61,4 @@ Comportamiento con JavaScript deshabilitado: no aplica, la aplicación no usa JS
 | Fecha | Estado de la implementación | Resultado | Evidencia |
 |---|---|---|---|
 | 2026-10-19 13:45 | Fase 1 + formulario público; panel admin sin implementar (A1-03 pendiente) | 64 casos: 19 PASS, 12 FAIL, 33 SKIP. Público (P1.1–P1.4, P2.1–P2.3, P7.1, P7.5, H.3–H.5, H.10–H.12, S.1–S.3, S.5) en PASS; todo /admin responde 404 (rutas aún no existen), el resto SKIP por falta de login | sin archivo (corrida exploratoria) |
+| 2026-10-19 14:20 | Commit 7bb711d (auth + panel), DB recién reinstalada (A2-04) | 68 casos: 67 PASS, 1 FAIL (H.16, hallazgo nuevo de A2-04: login acepta password + NUL + sufijo), 0 SKIP | sin archivo (corrida de revisión) |

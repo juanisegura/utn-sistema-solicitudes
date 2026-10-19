@@ -63,6 +63,7 @@ Columna "Prueba mínima": P1 a P7 corresponden a la consigna (P1 solicitud váli
 | P4.3 | GET /admin tras login fallido → 302 a /admin/login | P4 |
 | H.1 | login con credenciales correctas pero sin CSRF → 419 | extra · H |
 | H.2 | GET /admin tras login sin CSRF → sigue sin acceso | extra · H |
+| H.16 | login con password correcta + NUL (%00) + sufijo → 401 y sin acceso (bcrypt corta en el NUL; A2-04) | extra · H |
 | P5.1 | login correcto → 302 a /admin (prerrequisito) | P5 |
 | P5.2 | GET /admin con sesión → 200 (prerrequisito) | P5 |
 | S.4 | el ID de sesión cambia al loguear (session_regenerate_id) | extra · S |
@@ -170,3 +171,9 @@ El timeout de inactividad no se automatiza: el default es 1800 s. Procedimiento:
 7. Restaurar `app.session_timeout` al valor original (1800) al terminar.
 
 La config local la edita la persona que prueba; el script no la lee ni la modifica.
+
+Alternativa sin tocar la config (usada en A2-04, solo en desarrollo con `php -S`): la sesión se
+guarda en `/tmp/sess_<id>` (save_path por defecto). Tras loguearse, reescribir `_last_activity`
+de ese archivo a `ahora - 1801` (y `ahora - 1700` como control): `GET /admin` → 302 a
+`/admin/login` con ID nuevo y el archivo viejo borrado; un `POST` de estado con el token previo
+→ 401 sin cambio. Con el control (1700 s) → 200.

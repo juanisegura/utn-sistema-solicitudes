@@ -78,6 +78,18 @@ post() {
   req "$jar" POST "$path" "${args[@]}"
 }
 nuevo_jar() { : > "$J_NUEVO"; }
+# urlenc <texto> → percent-encoding byte a byte (para armar cuerpos crudos con --data)
+urlenc() {
+  local LC_ALL=C s=$1 out='' c i
+  for ((i = 0; i < ${#s}; i++)); do
+    c=${s:i:1}
+    case $c in
+      [a-zA-Z0-9.~_-]) out+=$c ;;
+      *) printf -v c '%%%02X' "'$c"; out+=$c ;;
+    esac
+  done
+  printf '%s' "$out"
+}
 header() { grep -i "^$1:" "$HDRS" | tail -1 | cut -d: -f2- | tr -d '\r' | sed 's/^ *//'; }
 # Location relativa al sitio (quita esquema y host si vienen)
 loc() { header Location | sed -E 's#^https?://[^/]+##'; }
@@ -172,6 +184,17 @@ post "$J_BAD" /admin/login "$F_LOGIN_EMAIL=$ADMIN_EMAIL" "$F_LOGIN_PASS=$ADMIN_P
 check H.1 "login con credenciales correctas pero sin CSRF → 419" "419" "$CODE"
 req "$J_BAD" GET /admin
 check H.2 "GET /admin tras login sin CSRF → sigue sin acceso" "302 /admin/login" "$CODE $(loc)"
+# bcrypt corta en el primer NUL: "password correcta + \0 + basura" no debe autenticar.
+# El NUL no entra en una variable de bash: se manda ya codificado (%00) con --data.
+nuevo_jar
+req "$J_NUEVO" GET /admin/login
+T_NUL=$(csrf_de "$BODY")
+req "$J_NUEVO" POST /admin/login --data-urlencode "$CSRF_FIELD=$T_NUL" \
+  --data-urlencode "$F_LOGIN_EMAIL=$ADMIN_EMAIL" --data "$F_LOGIN_PASS=$(urlenc "$ADMIN_PASSWORD")%00$MARCA"
+CODE_NUL=$CODE
+req "$J_NUEVO" GET /admin
+check H.16 "login con password correcta + NUL + sufijo → 401 y sin acceso" "401 302 /admin/login" \
+  "$CODE_NUL $CODE $(loc)"
 
 seccion "Login correcto (prerequisito de P1.5, P2.4, P5, P6, P7)"
 ADMIN_OK=0
