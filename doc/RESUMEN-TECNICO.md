@@ -12,7 +12,7 @@ con asistencia de IA: un orquestador, un implementador y un revisor
 ([ADR-0002](adr/0002-metodo-ia-orquestador-agentes.md)).
 
 La verificación local completa (`bash tests/run-all.sh`) da todo OK (detalle en
-[PRUEBAS](pruebas/PRUEBAS.md)): **131 tests unitarios, 24 de integración y 84 casos de smoke
+[PRUEBAS](pruebas/PRUEBAS.md)): **137 tests unitarios, 27 de integración y 84 casos de smoke
 HTTP**, entre ellos las 7 pruebas mínimas de la consigna.
 
 ## Arquitectura
