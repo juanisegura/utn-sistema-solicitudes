@@ -245,3 +245,103 @@ Evidencia en `doc/pruebas/`.
 | 8 | AGENTE 2 | `tests/smoke.sh`, evidencias, `doc/pruebas/PRUEBAS.md` |
 | 9 | AGENTE 1 + orquestador | README, ADRs restantes, RESUMEN-TECNICO, SELECCION-IA |
 | 10 | Orquestador | local-review, verificación final, push |
+
+## 5. Fase de mejoras (pedido de Juan, 2026-10-19, D-45)
+
+Cierra las "mejoras pendientes" del resumen técnico. Mismo criterio que las fases
+anteriores: contrato acá primero, pruebas escritas contra el contrato en paralelo a la
+implementación, revisión adversarial, corrida oficial del orquestador.
+
+### M-1 Límite de intentos exacto y proxies de confianza (ADR-0009 revisado)
+
+- **Atomicidad por "reservar y contar"**: antes de verificar credenciales se INSERTA el
+  intento en `login_intentos` y recién después se cuentan los de la ventana (incluido el
+  propio). Si el conteo supera el límite → se borra la fila propia (los bloqueados no se
+  registran, D-39) y 429. Con autocommit cada INSERT es visible para los conteos
+  concurrentes, así que N requests simultáneas no pueden pasar todas: como mucho pasa el
+  límite (puede bloquear de más bajo concurrencia, nunca de menos). Éxito → borrar la fila
+  propia y limpiar la cuenta. Fallo → la fila queda.
+- **Proxies de confianza**: `app.trusted_proxies` (lista de IPs o CIDR, vacía por
+  defecto). Si `REMOTE_ADDR` está en la lista, la IP del cliente es la primera dirección de
+  `X-Forwarded-For` **leyendo de derecha a izquierda** que no sea un proxy de confianza; si
+  el header falta o es inválido, se usa `REMOTE_ADDR`. Sin proxies configurados el header se
+  ignora (comportamiento actual). Validación con `filter_var(FILTER_VALIDATE_IP)`; IPv4 e
+  IPv6.
+
+### M-2 Historial de cambios de estado
+
+- Tabla `solicitud_eventos` (`id`, `solicitud_id` FK → solicitudes ON DELETE CASCADE,
+  `admin_id` FK → admins ON DELETE RESTRICT, `estado_anterior` y `estado_nuevo` con el mismo
+  ENUM, `created_at`; índice `(solicitud_id, created_at)`).
+- El cambio de estado corre en **transacción**: `SELECT estado … FOR UPDATE`, si es igual al
+  nuevo no se registra evento (no-op, sigue el 302 + flash), si cambia → `UPDATE` + `INSERT`
+  del evento; commit. Id inexistente → 404 como hoy.
+- El detalle muestra el historial (más reciente primero): fecha, admin, de → a. Sin
+  historial: "Sin cambios de estado todavía.". El alta no genera evento (el estado inicial
+  es `created_at` + `pendiente`).
+
+### M-3 Paginación y búsqueda en el listado
+
+- Query string: `estado` (como hoy), `q` (texto, trim, ≤ 100 caracteres, UTF-8 válido, sin
+  controles; vacío = sin búsqueda) y `pagina` (entero ≥ 1, default 1). 20 por página
+  (`app.por_pagina`).
+- Búsqueda: `LIKE` sobre `asunto`, `nombre`, `email` y `descripcion`, con `%`, `_` y `\`
+  del texto escapados (`ESCAPE '\\'`) y parámetro preparado. Combina con `estado`.
+- Errores: `q` inválido o `pagina` no entera/< 1 → **400**; `pagina` mayor que la última
+  (con al menos un resultado) → **404**; sin resultados → 200 con "No hay solicitudes que
+  coincidan.".
+- Los links de filtros y de paginación conservan los otros parámetros
+  (`http_build_query`, escapado con `e()`); el filtro activo sigue con `aria-current`;
+  la paginación es `<nav aria-label="Paginación">` con anterior/siguiente y "Página N de M".
+- Orden sin cambios: `created_at DESC, id DESC` (D-20).
+
+### M-4 Contadores con `GROUP BY`
+
+- `Solicitud::countByEstado(?string $q)`: un `SELECT estado, COUNT(*) … GROUP BY estado`
+  (con el mismo filtro de búsqueda que el listado, **sin** el filtro de estado), completado
+  con ceros para estados sin filas. Total = suma. Reemplaza `all()` + `array_count_values`
+  (D-34).
+
+### M-5 Sesión solo donde hace falta
+
+- La sesión ya no se inicia en `bootstrap` para toda request: se inicia **después de que el
+  Router encuentra la ruta y el método** (todas las rutas actuales la usan: CSRF, flash o
+  auth). 404, 405 y archivos estáticos no crean sesión ni envían `Set-Cookie`. Cierra D-32.
+
+### M-6 Rotación de logs
+
+- `storage/logs/app.log` rota por tamaño: al superar `app.log_max_bytes` (1 MB) se renombra
+  a `app.log.1` (corriendo `.1`→`.2`… hasta `app.log_max_archivos` = 5, el más viejo se
+  descarta), con `flock` para que dos requests no roten a la vez. Documentar `logrotate`
+  como alternativa en un servidor propio.
+
+### M-7 Tests unitarios y CI
+
+- Runner propio sin dependencias (`tests/unit/run.php`, `php tests/unit/run.php`), con
+  aserciones mínimas y salida PASS/FAIL + exit code; sin Composer (ADR-0001). Cubre
+  unidades puras: `Validator`, `Estado`, `Router` (matching, 404/405, `$D`), `Csrf`,
+  `Response::redirect` (destinos rechazados), `Request::ip()` con proxies (M-1),
+  `Admin::normalizeEmail`/`passwordAcceptable`, escape de `LIKE` (M-3), rotación (M-6).
+- Integración contra DB (`tests/integration/`, mismo runner, requiere DB de prueba):
+  atomicidad del límite (M-1) y transacción del historial (M-2).
+- **CI en GitHub Actions** (`.github/workflows/ci.yml`): matriz PHP **8.2** (versión mínima,
+  valida D-35) y la última estable; servicio **MySQL 8.0** (valida la compatibilidad que hoy
+  solo está probada en MariaDB); pasos: `php -l` de todo, unit, `config.local.php` generado
+  desde variables del workflow (credenciales efímeras del contenedor de CI, no secretos),
+  `instalar-db`, integración, `php -S` en background, `tests/smoke.sh`.
+
+### M-8 Timeout de sesión automatizado
+
+- Test que arranca la sesión con un timeout de pocos segundos (o manipula
+  `_last_activity`), y verifica que al vencer se vacía y cambia el ID, y que antes de vencer
+  no. Va en la suite unitaria/integración (CLI), no en el smoke HTTP.
+
+### Reparto y orden
+
+| Tarea | Responsable | Contenido | En paralelo con |
+|-------|-------------|-----------|-----------------|
+| A1-09 | AGENTE 1 | M-1, M-5, M-6 (infraestructura y seguridad) | A2-07 |
+| A2-07 | AGENTE 2 | M-7 (runner, unit de lo estable, CI) + M-8 | A1-09 |
+| A1-10 | AGENTE 1 | M-2, M-3, M-4 (panel) | A2-08 |
+| A2-08 | AGENTE 2 | Pruebas de M-1..M-5 contra contrato (unit/integración/smoke) | A1-10 |
+| A2-09 | AGENTE 2 | Revisión adversarial de toda la fase de mejoras | — |
