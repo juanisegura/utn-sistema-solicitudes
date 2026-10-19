@@ -3,16 +3,18 @@
 Desarrollé un sistema de solicitudes de soporte en PHP 8.2+ y MySQL/MariaDB, sin frameworks
 ni Composer:
 
-- **Parte pública:** formulario con confirmación.
+- **Parte pública:** formulario con confirmación, límite de envíos por IP y honeypot;
+  seguimiento del estado con un código que se entrega una sola vez.
 - **Panel de administración:** login con límite de intentos; listado con búsqueda, filtro por
-  estado y paginación; detalle con cambio de estado e historial.
+  estado y paginación; detalle con cambio de estado e historial; cambio de contraseña que
+  cierra las otras sesiones.
 
 Lo planifiqué con contratos escritos antes de implementar ([PLAN](PLAN.md)). Lo desarrollé
 con asistencia de IA: un orquestador, un implementador y un revisor
 ([ADR-0002](adr/0002-metodo-ia-orquestador-agentes.md)).
 
 La verificación local completa (`bash tests/run-all.sh`) da todo OK (detalle en
-[PRUEBAS](pruebas/PRUEBAS.md)): **151 tests unitarios, 31 de integración y 84 casos de smoke
+[PRUEBAS](pruebas/PRUEBAS.md)): **172 tests unitarios, 37 de integración y 107 casos de smoke
 HTTP**, entre ellos las 7 pruebas mínimas de la consigna.
 
 ## Arquitectura
@@ -31,11 +33,12 @@ request → public_html/index.php   único DocumentRoot; front controller
   `Kernel` los emite en un solo punto: no hay `exit` en `app/`.
 - **CSS:** propio, separado en base, layout, components y pages. Sin JS y compatible con la
   CSP `'self'`.
-- **Base de datos:** cuatro tablas InnoDB `utf8mb4`.
-  - `admins` y `solicitudes`: la segunda con un ENUM de estado, un índice `(estado,
-    created_at)` y un índice FULLTEXT.
+- **Base de datos:** cinco tablas InnoDB `utf8mb4`.
+  - `admins` y `solicitudes`: la segunda con un ENUM de estado, índices para el listado, un
+    índice FULLTEXT y el hash del código de seguimiento (nunca el código).
   - `solicitud_eventos`: el historial, con claves foráneas.
-  - `login_intentos`: IP más el SHA-256 del email.
+  - `login_intentos` y `envios_publicos`: límites por IP (el email solo como SHA-256).
+  - Los eventos de seguridad van a `security.log`, sin datos personales en claro.
   - La conexión fija `sql_mode` estricto.
 
 ## Decisiones que tomé
@@ -51,7 +54,11 @@ request → public_html/index.php   único DocumentRoot; front controller
   - una primera tanda de mejoras: historial, búsqueda y paginación, contadores con
     `GROUP BY`, sesión solo en rutas válidas, rotación de logs, proxies de confianza, tests
     unitarios y timeout automatizado;
-  - una segunda tanda: FULLTEXT, `RouteMatcher` y configuración centralizada.
+  - una segunda tanda: FULLTEXT, `RouteMatcher` y configuración centralizada;
+  - las funcionalidades finales: límite del formulario público con honeypot, registro de
+    eventos de seguridad, seguimiento público y cambio de contraseña del admin.
+- **Auditoría final** con GitHub Copilot CLI y dos subagentes antes de las funcionalidades
+  finales, y corrección de lo recomendado.
 - **Diseño visual:** paleta clara, blur solo en el header, sin cajas flotantes,
   aprovechando el ancho en desktop. CSS separado por responsabilidad. Aprobé el resultado
   revisando las capturas.
@@ -75,6 +82,9 @@ detalle está en [DECISIONES](ia/DECISIONES.md).
 - **Búsqueda FULLTEXT híbrida**: el índice prefiltra por palabras y un `LIKE` confirma la
   subcadena exacta; sin palabras indexables se usa solo el `LIKE`. Así no cambiaron los
   resultados que ya se esperaban ([ADR-0011](adr/0011-busqueda-fulltext-hibrida.md)).
+- **Seguimiento con un código de 128 bits** mostrado una sola vez: en la base se guarda
+  solo su hash, y cualquier error responde igual y tarda lo mismo
+  ([ADR-0013](adr/0013-seguimiento-publico-codigo.md)).
 - **Turnos de base de datos entre agentes:** las corridas simultáneas daban falsos
   negativos.
 
@@ -96,6 +106,8 @@ aceptarlo.
 | `ádmin@…` entraba aunque `admin@…` estuviera bloqueado | Pruebas del límite | Normalización única y comparación binaria. El implementador lo había anotado como "limitación aceptable" y se corrigió |
 | ReDoS en el recorte de espacios sin JIT de PCRE | Revisión de mejoras | Recorte lineal y tope de bytes |
 | `ESCAPE '\\'` dependía del `sql_mode` del servidor | Ídem | Carácter de escape bindeado |
+| Al cambiar la contraseña, un login con la contraseña vieja que coincidía con el cambio sobrevivía (reproducido: 45 de 45) | Revisión de funcionalidades finales | Lectura bloqueante del hash y `SYSDATE(6)` en el login, `FOR UPDATE` en el cambio. La primera corrección que propuso el orquestador no alcanzaba y el implementador la reemplazó tras medirla |
+| El honeypot es distinguible para un bot que lea `/gracias` | Ídem | Aceptado como trampa barata: mostrar datos falsos engañaría a una persona real |
 
 **Sugerencias descartadas:**
 - Tokens CSRF de un solo uso: rompen el doble envío y las pestañas múltiples.
@@ -117,6 +129,10 @@ aceptarlo.
 - **FULLTEXT ≠ LIKE.** Un índice puro cambiaba el resultado de búsquedas como `100%_ok`, de
   palabras cortas y de stopwords. Medí la tokenización real de MariaDB y validé el diseño
   híbrido con unas 3000 consultas comparadas contra `LIKE`: cero falsos negativos.
+- **Cambio de contraseña bajo concurrencia.** Con una sonda de 24 logins escalonados por
+  ronda: antes sobrevivían 62 de 70 sesiones con la contraseña vieja; con la primera
+  corrección, 30 de 70; con la definitiva, 0 de 105. En el camino apareció otro bug: el
+  rehash automático podía pisar una contraseña recién cambiada.
 - **Proceso.** Hubo corridas de tests simultáneas de distintas sesiones sobre la misma base,
   y una la provocó la propia orquestación. Se descartaron y se fijaron turnos explícitos. El
   push del workflow de CI requería un permiso extra de GitHub; después decidí no usar CI.
@@ -140,10 +156,10 @@ documenté el resto ([AUDITORIA-FINAL](auditoria/AUDITORIA-FINAL.md)).
 - PHP 8.2 y MySQL 8.0 no tienen verificación automática: todo se probó con PHP 8.5 y
   MariaDB 11.8.
 - En un servidor propio convendría usar `logrotate` en lugar de la rotación del código.
-- El formulario público no tiene límite de frecuencia (solo CSRF): mejora, reutilizar el
-  patrón del límite de login por IP.
-- No hay registro de eventos de seguridad (logins, 429, 419); mejora, una línea de log sin
-  datos personales por evento.
+- El `security.log` se puede desplazar con volumen anónimo (rotación de 5 MB): mejora,
+  agrupar eventos por IP o enviarlos a un colector externo.
+- El código de seguimiento no se puede recuperar si se pierde, y pasa en claro por la sesión
+  del servidor hasta que se muestra.
 - En producción conviene un usuario de DB solo con permisos de datos para la app y otro con
   DDL para el instalador; HSTS desde el servidor HTTPS y vencimiento absoluto de sesión.
 - Refactor de cohesión: extraer la búsqueda de `Solicitud` y la lógica de IP de `Request`.

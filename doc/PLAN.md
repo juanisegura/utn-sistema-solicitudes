@@ -88,7 +88,7 @@ app/
 │       └── SolicitudAdminController.php # index (filtro), show, updateEstado
 ├── Models/                  # namespace App\Models — único lugar con SQL (preparado)
 │   ├── Solicitud.php        # create, all(estado?), find(id), updateEstado
-│   ├── Admin.php            # findByEmail, find, create, updatePasswordHash, touchLastLogin
+│   ├── Admin.php            # findByEmail, paraLogin (D-66), find, create, cambiarPassword, updatePasswordHash, touchLastLogin
 │   └── Estado.php           # enum PHP 8.1 backed: valores + etiquetas (lista blanca)
 └── Views/
     ├── layouts/public.php · admin.php

@@ -25,8 +25,11 @@ ningún lado para investigar un abuso. Juan decidió cerrarlos (D-63, PLAN §7, 
   seguimiento (F-3) la reutiliza contando solo los intentos fallidos.
 - **Honeypot:** un campo `sitio_web` fuera de la pantalla (posición absoluta, sin
   `display:none`), con `aria-hidden` en su contenedor y `tabindex="-1"`. Si llega con
-  contenido, no se guarda nada y se responde como un éxito: 302 a una confirmación genérica,
-  sin número, para no darle al bot una señal que le permita adaptarse.
+  contenido, no se guarda nada y se responde como un éxito: el POST devuelve exactamente la
+  misma respuesta HTTP (302 a `/gracias`), pero la confirmación es genérica, sin número ni
+  código. Un bot que lea esa página puede notar la diferencia: es una trampa barata asumida
+  (D-65); mostrar un número o un código falsos le mentiría a una persona real que complete el
+  campo por error.
 - **Log de seguridad** en `storage/logs/security.log`, un canal de `App\Core\Log` con la
   misma rotación. Una línea por evento: `fecha | evento | ip | método path | admin_id |
   detalle`. Eventos: login ok, fallido y bloqueado; CSRF inválido; acceso al panel sin
@@ -58,6 +61,12 @@ ningún lado para investigar un abuso. Juan decidió cerrarlos (D-63, PLAN §7, 
   hace unos 35 envíos desde la misma IP. `tests/run-all.sh` levanta su servidor con una
   config de prueba (`APP_CONFIG_LOCAL`, D-64) que solo sube `form_max_por_ip` a 50; la app
   conserva 5.
+- Revisión A2-16: el honeypot es distinguible para un bot que lea `/gracias` y, con
+  campos inválidos, responde 302 donde un envío real daría 422 (D-65). Se acepta.
+- El `security.log` se puede desplazar por volumen: `acceso_sin_sesion` y `csrf_invalido`
+  no tienen límite propio y la rotación conserva 5 MB; un flujo masivo de requests anónimas
+  empuja fuera los eventos viejos. Mejora pendiente: limitar o agrupar esos eventos por IP, o
+  enviar el canal a un colector externo con más retención.
 - El honeypot solo frena bots simples. Uno que ejecute JavaScript y respete el CSS lo puede
   evitar; para eso está el límite por IP.
 - El `security.log` contiene IPs, que son datos personales en algunas jurisdicciones:

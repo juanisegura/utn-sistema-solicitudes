@@ -2,8 +2,8 @@
 
 Evidencia de las pruebas realizadas sobre el sistema de solicitudes (consigna §4) y de las verificaciones adicionales definidas en el PLAN (§3 y §5).
 
-**Corrida oficial vigente**: 2026-10-19 16:41, código con las correcciones de la auditoría final (D-62), DB recién reinstalada, `bash tests/run-all.sh --evidencia` → **todo OK**: sintaxis, 151 tests unitarios, 31 de integración y 84 casos smoke, sin fallas ni omitidos. Corrida hecha por el orquestador.
-Evidencia: [`evidencias/run-all-20261019-164135.txt`](evidencias/run-all-20261019-164135.txt) (salida completa de las cinco etapas) y [`evidencias/smoke-20261019-164146.txt`](evidencias/smoke-20261019-164146.txt) (smoke con `--evidencia`).
+**Corrida oficial vigente**: 2026-10-19 17:19, código del commit `dcfb77e` (funcionalidades finales y correcciones de todas las revisiones), DB recién reinstalada, `bash tests/run-all.sh --evidencia` → **todo OK**: sintaxis, 172 tests unitarios, 37 de integración y 107 casos smoke, sin fallas ni omitidos. Corrida hecha por el orquestador.
+Evidencia: [`evidencias/run-all-20261019-171951.txt`](evidencias/run-all-20261019-171951.txt) (salida completa de las cinco etapas) y [`evidencias/smoke-20261019-172017.txt`](evidencias/smoke-20261019-172017.txt) (smoke con `--evidencia`).
 
 Cómo reproducirla: `bash tests/run-all.sh` desde la raíz del repo (requiere la DB de desarrollo, que se borra y recrea; detalle en [`../../tests/README.md`](../../tests/README.md)).
 
@@ -11,7 +11,7 @@ Cómo reproducirla: `bash tests/run-all.sh` desde la raíz del repo (requiere la
 
 | Prueba mínima | Resultado esperado | Resultado obtenido | Casos | Evidencia |
 |---|---|---|---|---|
-| 1. Registro de solicitud válida | 302 a `/gracias` con confirmación visible (PRG); la solicitud aparece en el panel con asunto, email y descripción | ✅ 6/6 PASS | P1.1–P1.6 | `smoke-20261019-164146.txt` |
+| 1. Registro de solicitud válida | 302 a `/gracias` con confirmación visible (PRG); la solicitud aparece en el panel con asunto, email y descripción | ✅ 6/6 PASS | P1.1–P1.6 | `smoke-20261019-172017.txt` |
 | 2. Campos inválidos o incompletos | 422 con un mensaje por campo (obligatorio, email inválido, solo espacios, también Unicode); ninguna fila nueva | ✅ 5/5 PASS | P2.1–P2.5 | ídem |
 | 3. Acceso al panel sin sesión | GET de `/admin`, detalle y filtro → 302 a `/admin/login`; POST de logout sin sesión → 401 | ✅ 4/4 PASS | P3.1–P3.4 | ídem |
 | 4. Credenciales incorrectas | 401 con el mismo mensaje genérico para password errónea y email inexistente; sin acceso posterior | ✅ 3/3 PASS | P4.1–P4.3 | ídem |
@@ -26,8 +26,8 @@ El detalle de cada caso (ID → descripción) está en `tests/README.md`, secci�
 | Capa | Comando | Casos | Resultado oficial |
 |---|---|---|---|
 | Sintaxis | `php -l` de `app/`, `public_html/`, `scripts/`, `tests/` | todo el árbol | OK |
-| Unitarios (sin DB ni red) | `php tests/unit/run.php` | 151 | 151 PASS |
-| Integración (DB + app en `php -S` con 8 workers) | `php tests/integration/run.php` | 31 | 31 PASS |
+| Unitarios (sin DB ni red) | `php tests/unit/run.php` | 172 | 172 PASS |
+| Integración (DB + app en `php -S` con 8 workers) | `php tests/integration/run.php` | 37 | 37 PASS |
 | Smoke HTTP | `bash tests/smoke.sh` | 84 | 84 PASS |
 
 **Smoke por familia** (84):
@@ -41,7 +41,7 @@ El detalle de cada caso (ID → descripción) está en `tests/README.md`, secci�
 | L — límite de intentos (D-38, D-41) | 6 | 5 fallos → 401 y el 6.º → 429 + `Retry-After` (L.1); por cuenta, no global (L.2); bloqueado aun con password correcta (L.3); sin CSRF no cuenta (L.4); variantes con acento no son otra cuenta (L.6); mayúsculas sí se normalizan (L.7) |
 | B — búsqueda, paginación, historial, sesión perezosa (M-2, M-3, M-5) | 10 | búsqueda (B.1), `%` y `_` literales (B.2), `q` reflejado escapado (B.3), `q`/`pagina` inválidos → 400 (B.4, B.4b, B.5), fuera de rango → 404 (B.6), links conservan `q` y `estado` (B.7), historial y no-op (B.8), 404/405/estáticos sin `Set-Cookie` (B.9) |
 
-**Unitarios por archivo** (151 en la corrida oficial): ver la tabla por archivo de [tests/README.md](../../tests/README.md), que incluye los agregados de las correcciones de la auditoría (LoginThrottle, Config, InstalarDb, ENUM).
+**Unitarios por archivo** (172 en la corrida oficial): ver la tabla por archivo de [tests/README.md](../../tests/README.md).
 
 **Integración** (27): atomicidad del límite de intentos bajo concurrencia (M-1, 3 casos: 4 fallos + 8 intentos simultáneos → como mucho un 401), historial de estados en transacción (M-2, 8 casos: eventos encadenados también con cambios simultáneos, no-op sin evento, FKs CASCADE/RESTRICT), búsqueda FULLTEXT híbrida (R-1, 13 casos: índice, `EXPLAIN`, prefijo, subcadena interna, fallback LIKE, stopword con acento, token de 84 y la limitación documentada de > 84) y control de flujo y `bootstrap-cli` (R-2/R-3, 3 casos).
 
@@ -147,5 +147,6 @@ Corridas previas, durante el desarrollo. **No son la evidencia vigente** (ver "C
 | 15:12 | aa86133 (fixes de A2-08) | run-all: todo OK (101 / 11 / 84) | oficial de entonces | [`evidencias/historial/run-all-20261019-151247.txt`](evidencias/historial/run-all-20261019-151247.txt), [`evidencias/historial/smoke-20261019-151255.txt`](evidencias/historial/smoke-20261019-151255.txt) |
 | 15:51 | código de aa86133 + caso TAB | run-all: todo OK (102 / 11 / 84) | oficial de entonces | [`evidencias/historial/run-all-20261019-155152.txt`](evidencias/historial/run-all-20261019-155152.txt), [`evidencias/historial/smoke-20261019-155159.txt`](evidencias/historial/smoke-20261019-155159.txt) |
 | 16:21 | e93b953 (cierre de la segunda fase) | run-all: todo OK (137 / 27 / 84) | oficial de entonces | [`evidencias/historial/run-all-20261019-162131.txt`](evidencias/historial/run-all-20261019-162131.txt), [`evidencias/historial/smoke-20261019-162141.txt`](evidencias/historial/smoke-20261019-162141.txt) |
+| 16:41 | correcciones de la auditoría (D-62) | run-all: todo OK (151 / 31 / 84) | oficial de entonces | [`evidencias/historial/run-all-20261019-164135.txt`](evidencias/historial/run-all-20261019-164135.txt), [`evidencias/historial/smoke-20261019-164146.txt`](evidencias/historial/smoke-20261019-164146.txt) |
 | A2-11, 16:14 | f0ab4c0 + 523b622 + tests de A2-11 | `run-all --continuar`: unitarios 136/137 e integración 25/27 (las 3 fallas son las regresiones de hallazgos de A2-11, esperadas), smoke 84/84; smoke contra :8080 84/84 | revisión con hallazgos | [`evidencias/historial/run-all-20261019-161448-A2-11-hallazgos.txt`](evidencias/historial/run-all-20261019-161448-A2-11-hallazgos.txt), [`evidencias/historial/smoke-20261019-161458.txt`](evidencias/historial/smoke-20261019-161458.txt) |
 | A2-16, 17:12 | 8977503 + tests de A2-16 | `run-all --continuar`: unitarios 172/172, integración 36/37 (la falla es la regresión de la carrera de F-5, esperada), smoke 107/107 | revisión con hallazgo | [`evidencias/historial/run-all-20261019-171211-A2-16-carrera.txt`](evidencias/historial/run-all-20261019-171211-A2-16-carrera.txt), [`evidencias/historial/smoke-20261019-171229.txt`](evidencias/historial/smoke-20261019-171229.txt) |

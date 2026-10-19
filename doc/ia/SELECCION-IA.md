@@ -2,7 +2,7 @@
 
 Entregable de la consigna §5. El registro completo y literal de **todos** los prompts y
 respuestas está en [`registro/`](registro/). La bitácora por tarea está en
-[`PROMPTS.md`](PROMPTS.md), las decisiones numeradas (D-01…D-62) en
+[`PROMPTS.md`](PROMPTS.md), las decisiones numeradas (D-01…D-66) en
 [`DECISIONES.md`](DECISIONES.md) y el triage de las revisiones automáticas en
 [`revisiones/`](revisiones/).
 
@@ -89,7 +89,7 @@ simultáneos; el nuevo deja exactamente 1, también con 30.
 
 - **Nunca acepté un "PASS" informado sin repetirlo.** Corrí la suite completa por mi cuenta
   sobre una DB reinstalada en cada entrega. La corrida oficial final con `run-all.sh` dio
-  unit 137, integración 27 y smoke 84, todos OK.
+  unit 172, integración 37 y smoke 107, todos OK.
 - **Reproduje los hallazgos antes de aceptarlos.** Por ejemplo:
   - M1: `.git/config` respondía 200 en Apache; después del fix, 403.
   - El login con `password%00xyz` entraba.
@@ -118,6 +118,9 @@ simultáneos; el nuevo deja exactamente 1, también con 30.
 | Revisión local (Ollama) | Quitar `Require all denied` del `.htaccess` raíz | **Descartada** | Es el control que impide exponer `.git/` |
 | AGENTE 1 (A1-03) | Tocar `public_html/.htaccess`, fuera de su reserva | **Aceptada** (D-33) | Sin `Require all granted`, el deny de la raíz rompía el sitio |
 | AGENTE 1 (A1-05) | Fijar también el algoritmo de hash, no solo el costo | **Aceptada** (D-37) | Un cambio de `PASSWORD_DEFAULT` reabriría la fuga por tiempo |
+| **Orquestador** (D-65) | Corregir la carrera del cambio de contraseña tomando `auth_at` con `NOW(6)` en la consulta que lee el hash | **Corregida por AGENTE 1** (D-66) | Midió que no alcanzaba (30 de 70 sesiones viejas sobrevivían): `NOW()` es el inicio de la sentencia y la lectura de instantánea de InnoDB sigue viendo el hash viejo. La reemplazó por `LOCK IN SHARE MODE` + `SYSDATE(6)` y `FOR UPDATE` en el cambio: 0 de 105 |
+| Copilot CLI (auditoría) | Falta `Cache-Control: no-store` en respuestas autenticadas | **Descartada**: falso positivo | Verificado por HTTP: PHP lo envía al iniciar la sesión |
+| AGENTE 2 (A2-16) | Mostrar un número y un código falsos al honeypot para que no sea distinguible | **Descartada** (D-65) | Le mentiría a una persona real que complete el campo por error; se acepta como trampa barata |
 
 ## Decisiones que tomé personalmente (Juan)
 

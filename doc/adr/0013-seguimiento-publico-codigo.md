@@ -51,8 +51,11 @@ solo (PLAN §7, F-3, D-63).
 
 - Si la persona pierde el código, no hay recuperación: tiene que pedir el estado a soporte.
   La página lo dice.
-- El código pasa brevemente por la sesión (flash, del lado del servidor) y se borra al
-  mostrarlo; si `/gracias` nunca se visita, queda hasta que la sesión vence.
+- El código pasa brevemente **en claro** por la sesión (flash, en el archivo de sesión del
+  servidor) y se borra al mostrarlo; si `/gracias` nunca se visita, queda hasta que el
+  recolector de sesiones lo elimina. No tiene exposición por HTTP, pero quien lea los
+  archivos de sesión del servidor podría verlo en esa ventana (señalado en la revisión A2-16,
+  aceptado: el patrón PRG lo requiere).
 - El número sigue siendo enumerable, pero sin el código no revela nada: todas las respuestas
   fallidas son iguales.
 - Un número con formato inválido no consulta la DB; eso se distingue por tiempo, pero solo

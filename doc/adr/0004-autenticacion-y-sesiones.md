@@ -112,3 +112,15 @@ El panel permite al admin cambiar su contraseña en `/admin/cuenta/password` (au
   cerrarse.
 - El rehash automático al loguear (`password_needs_rehash`) **no** actualiza
   `password_changed_at`: un cambio de algoritmo o costo no debe cerrar sesiones.
+
+**Ajuste por la revisión A2-16 (D-65, D-66).** La primera versión tomaba `auth_at` después
+de verificar la contraseña (unos 250 ms de bcrypt) y `password_changed_at` antes del bcrypt
+de la nueva: un login con la contraseña vieja que coincidía con un cambio sobrevivía. Ahora
+el login lee el hash con `LOCK IN SHARE MODE` y toma `auth_at` con `SYSDATE(6)` en la misma
+consulta (no `NOW(6)`, que es el inicio de la sentencia, ni una lectura de instantánea de
+InnoDB, que seguiría viendo el hash viejo); el cambio de contraseña calcula el bcrypt fuera
+de la transacción y después toma la fila con `FOR UPDATE` y escribe `NOW(6)`. Así todo login
+que leyó el hash viejo queda con `auth_at` anterior al cambio, y el que llega durante el
+cambio espera y lee el hash nuevo. El rehash automático solo reemplaza el hash que se
+verificó (`WHERE password_hash = ?`), para no pisar una contraseña recién cambiada.
+Verificado con una sonda de concurrencia: 0 sesiones sobrevivientes en 15 rondas.

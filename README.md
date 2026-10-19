@@ -170,8 +170,8 @@ bash tests/run-all.sh --evidencia   # además guarda la salida del smoke en doc/
 ```
 
 Recrea las tablas, así que hay que correrlo contra una base de desarrollo. No toca el
-servidor de `:8080`. Último resultado: 151 tests unitarios, 31 de integración y 84 casos
-de smoke, todo OK ([evidencia](doc/pruebas/evidencias/run-all-20261019-164135.txt)).
+servidor de `:8080`. Último resultado: 172 tests unitarios, 37 de integración y 107 casos
+de smoke, todo OK ([evidencia](doc/pruebas/evidencias/run-all-20261019-171951.txt)).
 
 Cada capa por separado:
 
