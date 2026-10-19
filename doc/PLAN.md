@@ -21,6 +21,24 @@ Fuente: consigna "Evaluación Final Integradora — Desafío avanzado" (UTN). En
 | D1 | Tablas `admins` y `solicitudes` | `database/schema.sql` |
 | D2 | Script SQL reproducible + datos de prueba no sensibles | `database/schema.sql`, `database/seed.sql` |
 
+### Extra 1 implementado — límite de intentos de login (contrato, D-38)
+
+- Tabla `login_intentos` (`id`, `ip VARCHAR(45)`, `email_hash CHAR(64)` = SHA-256 del email
+  normalizado en minúsculas y recortado — no se guarda el email en claro, `created_at`;
+  índices `(ip, email_hash, created_at)` y `(ip, created_at)`).
+- Solo se registran **intentos fallidos**. Ventana: 15 min. Límites configurables en
+  `app.login_max_por_cuenta` (5, por IP + email) y `app.login_max_por_ip` (20, por IP sola,
+  frena el "password spraying" sobre muchos emails).
+- Si se alcanzó un límite, el intento **no se verifica** (ni siquiera con la contraseña
+  correcta): **429** + header `Retry-After` (segundos hasta que vence el intento más viejo de
+  la ventana) + re-render del login con "Demasiados intentos. Probá de nuevo en N minutos.".
+  El bloqueo aplica igual exista o no el email (no permite enumerar).
+- Login exitoso borra los fallos de esa IP + email. Los registros de más de 24 h se purgan
+  al registrar un fallo.
+- IP = `REMOTE_ADDR` (no se confía en `X-Forwarded-For`).
+- El orden de controles no cambia: ruta → CSRF → límite → credenciales (el login no tiene
+  `auth`); un POST sin CSRF válido da 419 y no cuenta como intento.
+
 ### Fuera de alcance (consigna §8) → "mejoras pendientes" del resumen técnico
 
 Notificaciones por correo, múltiples roles, integraciones externas, deploy a producción,
@@ -28,7 +46,7 @@ diseño visual complejo.
 
 ### Extras (solo después de tener F1–F9 probados, en este orden)
 
-1. Límite de intentos de login (tabla `login_intentos`, bloqueo temporal por IP+email).
+1. ~~Límite de intentos de login~~ → implementado, ver contrato arriba (D-38).
 2. Historial de cambios de estado (tabla `solicitud_eventos`: quién, cuándo, de→a).
 3. Paginación del listado y búsqueda por texto.
 
