@@ -12,6 +12,10 @@ $defaults = [
         'base_url' => '',
         // Inactividad máxima de la sesión, en segundos (D-21).
         'session_timeout' => 1800,
+        // Límite de intentos de login (ADR-0009): fallos tolerados en la ventana antes del 429.
+        'login_max_por_cuenta' => 5,   // por IP + email
+        'login_max_por_ip'     => 20,  // por IP sola (muchos emails desde la misma IP)
+        'login_ventana_seg'    => 900,
     ],
     'db' => [
         'host'    => '127.0.0.1',

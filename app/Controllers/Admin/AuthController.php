@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Admin;
 
 use App\Core\Auth;
+use App\Core\LoginThrottle;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
@@ -28,11 +29,29 @@ final class AuthController
         }
         $email = Request::string('email') ?? '';
         $password = Request::string('password') ?? '';
+        $ip = Request::ip();
+
+        // Límite de intentos (ADR-0009): bloqueado → ni se verifica la password ni se consulta admins.
+        $espera = LoginThrottle::segundosBloqueado($ip, $email);
+        if ($espera !== null) {
+            $minutos = (int) ceil($espera / 60);
+            $this->renderLogin(
+                $email,
+                'Demasiados intentos. Probá de nuevo en ' . $minutos . ($minutos === 1 ? ' minuto.' : ' minutos.'),
+                429,
+                ['Retry-After' => (string) $espera]
+            );
+
+            return;
+        }
 
         if (Auth::attempt($email, $password)) {
+            LoginThrottle::limpiar($ip, $email);
             Response::redirect('/admin');
         }
 
+        // Cuenta todo fallo (también >72 bytes, NUL o email no UTF-8): es un intento de credenciales.
+        LoginThrottle::registrarFallo($ip, $email);
         // Mismo mensaje para email inexistente, password errónea o admin inactivo.
         $this->renderLogin($email, 'Email o contraseña incorrectos.', 401);
     }
@@ -44,13 +63,14 @@ final class AuthController
     }
 
     /** Re-muestra el email (escapado en la vista); la password nunca vuelve al HTML. */
-    private function renderLogin(string $email, ?string $error, int $status): void
+    /** @param array<string, string> $headers */
+    private function renderLogin(string $email, ?string $error, int $status, array $headers = []): void
     {
         Response::html(View::render('admin/login', [
             'title' => 'Ingreso al panel',
             'email' => trim($email),
             'error' => $error,
             'admin' => null,
-        ], 'layouts/admin'), $status);
+        ], 'layouts/admin'), $status, $headers);
     }
 }

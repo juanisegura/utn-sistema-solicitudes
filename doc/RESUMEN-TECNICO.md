@@ -34,10 +34,11 @@ Solo `public_html/` es DocumentRoot; el resto del código y la config quedan fue
 
 ## Base de datos
 
-Definida en [database/schema.sql](../database/schema.sql), con dos tablas:
+Definida en [database/schema.sql](../database/schema.sql), con tres tablas:
 
 - `admins`: `id`, `nombre`, `email` (**UNIQUE**, `uq_admins_email`), `password_hash`, `activo`, `last_login_at`, `created_at`.
 - `solicitudes`: `id`, `nombre`, `email`, `asunto`, `descripcion` (TEXT), `estado` (`ENUM('pendiente','en_proceso','resuelta')`, default `pendiente`), `created_at`, `updated_at`.
+- `login_intentos`: `ip`, `email_hash` (SHA-256 del email normalizado: el email no se guarda en claro), `created_at`; índices `(ip, email_hash, created_at)` y `(ip, created_at)` para contar fallos por cuenta y por IP dentro de la ventana ([ADR-0009](adr/0009-limite-intentos-login.md)).
 - Índice `idx_estado_fecha (estado, created_at)`: cubre la consulta del panel, que filtra por estado y ordena por fecha.
 - Motor InnoDB y `utf8mb4_unicode_ci`: InnoDB es el motor transaccional por defecto de MySQL 8 y MariaDB; `utf8mb4` guarda Unicode completo (tildes, eñes y emojis, que `utf8` de 3 bytes no admite) y la collation `_ci` hace que el email único no distinga mayúsculas.
 - `Database::connect` ejecuta `SET SESSION sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'` ([app/Core/Database.php](../app/Core/Database.php)): sin modo estricto, MySQL guarda `''` ante un ENUM inválido o trunca en silencio.
@@ -53,6 +54,7 @@ Definida en [database/schema.sql](../database/schema.sql), con dos tablas:
 - [ADR-0006](adr/0006-estados-enum.md): estados como ENUM en la DB y enum PHP como lista blanca.
 - [ADR-0007](adr/0007-configuracion-y-secretos.md): defaults seguros versionados y credenciales en `config.local.php`, fuera de Git.
 - [ADR-0008](adr/0008-errores-y-codigos-http.md): errores internos al log con vista 500 genérica, y códigos HTTP explícitos para los errores esperados.
+- [ADR-0009](adr/0009-limite-intentos-login.md): límite de intentos de login por IP + email y por IP sola, con 429 y `Retry-After`.
 
 ## Seguridad
 
@@ -61,6 +63,7 @@ Definida en [database/schema.sql](../database/schema.sql), con dos tablas:
 | SQL injection | Consultas preparadas reales; el estado entra solo como valor del enum `Estado` | [Database.php](../app/Core/Database.php), [Solicitud.php](../app/Models/Solicitud.php), [Estado.php](../app/Models/Estado.php) | P6.5, P7.1, P7.4, P7.6, P7.7 |
 | XSS | `e()` (`htmlspecialchars` con `ENT_QUOTES`) en la salida; CSP `default-src 'self'`. Se guarda lo enviado y se escapa al mostrar (D-30) | [helpers.php](../app/helpers.php), [Views/](../app/Views/), [bootstrap.php](../app/bootstrap.php) | P7.2, P7.3, P7.4, P7.5, S.3 |
 | Contraseñas | bcrypt con costo fijo 12 (`Admin::HASH_ALGO`/`HASH_OPTIONS`, D-35) en el alta, el rehash y el hash ficticio que se verifica si el email no existe; `password_verify`; rechazo de más de 72 bytes o con byte NUL (D-36) | [Auth.php](../app/Core/Auth.php), [Admin.php](../app/Models/Admin.php) | P4.1, P4.2 (mismo mensaje y 401), H.16 |
+| Fuerza bruta en el login | Límite de intentos fallidos en 15 min: 5 por IP + email y 20 por IP sola (`app.login_*`). Al alcanzarlo, 429 + `Retry-After` sin verificar la contraseña ni consultar `admins` (igual para emails existentes o no). El éxito limpia los fallos de esa cuenta; el email se guarda como SHA-256 (D-38) | [LoginThrottle.php](../app/Core/LoginThrottle.php), [LoginIntento.php](../app/Models/LoginIntento.php), [AuthController.php](../app/Controllers/Admin/AuthController.php) | casos de AGENTE 2 (A2-05) |
 | Sesión | Cookie `utn_sesion` HttpOnly y SameSite=Lax (Secure con HTTPS o `env=production`), `use_strict_mode`, regeneración de ID y del token CSRF en login, timeout por inactividad (`app.session_timeout`), logout destruye la sesión y la cookie | [Session.php](../app/Core/Session.php), [Auth.php](../app/Core/Auth.php) | S.4, S.5, S.8; timeout solo manual |
 | CSRF | Token de 32 bytes, `hash_equals`, validado en el Router en todo POST; fallo devuelve 419 | [Csrf.php](../app/Core/Csrf.php), [Router.php](../app/Core/Router.php) | H.1, H.3, H.4, H.5, P6.2, P6.3, S.7 |
 | Autorización / acceso al panel | `'auth' => true` en las rutas `/admin/*` salvo login; `Auth::user()` re-verifica en DB que el admin siga activo. Sin sesión: GET 302, POST 401 (D-17) | [routes.php](../app/routes.php), [Auth.php](../app/Core/Auth.php) | P3.1–P3.4, P6.1, P6.7, H.2 |
@@ -77,11 +80,12 @@ Definida en [database/schema.sql](../database/schema.sql), con dos tablas:
 - **Campos "obligatorios" con solo NBSP.** `trim()` solo quita espacios ASCII, así que pasaban como no vacíos. Implementé un recorte Unicode en `Validator` (D-31).
 - **Deprecaciones de PHP 8.5.** En local uso PHP 8.5, que ya depreca las constantes `PDO::MYSQL_*` (lo vi al escribir la capa de datos). La revisión del agente revisor (A2-03) marcó que el manejador de errores convertía cualquier deprecación en excepción, de modo que una actualización de PHP podía tumbar requests que funcionaban. Ahora `bootstrap.php` las registra en el log y la request continúa.
 - **Costo de bcrypt y versión de PHP.** Al principio hasheaba con `PASSWORD_DEFAULT`, cuyo costo pasó de 10 a 12 en PHP 8.4. El hash ficticio del login (para que un email inexistente tarde lo mismo) tenía costo 12: con PHP 8.2/8.3 los hashes reales serían de costo 10 y el tiempo de respuesta revelaría qué emails existen. Ahora el algoritmo y el costo son fijos y compartidos (D-35, hallazgo de la revisión A2-04).
+- **Ventana del límite de intentos y zona horaria.** Al diseñarlo vi un riesgo: la bitácora de fallos usa `created_at DEFAULT CURRENT_TIMESTAMP` (reloj de la DB) y PHP corre en `America/Argentina/Buenos_Aires` (D-24). Calcular el corte de la ventana en PHP podía correrla horas si ambas zonas horarias no coincidían. Por eso tanto el corte (`NOW() - INTERVAL ? SECOND`) como los segundos del `Retry-After` (`TIMESTAMPDIFF`) se calculan en la DB, con un solo reloj.
 - **Parámetros como array.** `estado[]=x` provocaba un `TypeError` (500) al llegar a código tipado con `string`. `Request::string()` devuelve null si el valor no es string (hallazgo M3, D-27).
 
 ## Mejoras pendientes
 
-- Límite de intentos de login (D-22): no se implementó; no existe tabla `login_intentos` ni código asociado. Hoy la única fricción ante fuerza bruta es el costo de bcrypt (12: unos 150 ms por verificación medidos en el equipo de desarrollo).
+- Límite de intentos: es aproximado ante requests simultáneas (contar y registrar no son atómicos) y, detrás de un proxy o CDN, `REMOTE_ADDR` sería la IP del proxy; habría que confiar en `X-Forwarded-For` solo desde proxies conocidos ([ADR-0009](adr/0009-limite-intentos-login.md)).
 - Historial de cambios de estado (quién, cuándo, de y a).
 - Paginación y búsqueda de texto en el listado (D-20).
 - `countByEstado()` con `GROUP BY` (D-34): hoy los contadores del listado se calculan en PHP sobre `Solicitud::all()`.

@@ -4,6 +4,7 @@
 
 SET NAMES utf8mb4;
 
+DROP TABLE IF EXISTS login_intentos;
 DROP TABLE IF EXISTS solicitudes;
 DROP TABLE IF EXISTS admins;
 
@@ -34,4 +35,16 @@ CREATE TABLE solicitudes (
     PRIMARY KEY (id),
     -- Cubre el listado del panel: filtro por estado ordenado por fecha.
     KEY idx_estado_fecha (estado, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Intentos de login FALLIDOS para el límite de intentos (ADR-0009). Sin FK a admins: se
+-- registran también los emails inexistentes, y el email se guarda como SHA-256 (no en claro).
+CREATE TABLE login_intentos (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ip          VARCHAR(45)  NOT NULL,          -- IPv6 en texto ocupa hasta 45 caracteres
+    email_hash  CHAR(64)     NOT NULL,          -- hash('sha256', mb_strtolower(trim(email)))
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_cuenta (ip, email_hash, created_at), -- límite por IP + email
+    KEY idx_ip (ip, created_at)                  -- límite por IP sola
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

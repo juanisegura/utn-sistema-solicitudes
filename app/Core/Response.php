@@ -19,10 +19,14 @@ final class Response
         500 => 'Error interno',
     ];
 
-    public static function html(string $html, int $status = 200): void
+    /** @param array<string, string> $headers p. ej. ['Retry-After' => '840'] para el 429 */
+    public static function html(string $html, int $status = 200, array $headers = []): void
     {
         http_response_code($status);
         header('Content-Type: text/html; charset=UTF-8');
+        foreach ($headers as $name => $value) {
+            header($name . ': ' . $value);
+        }
         echo $html;
     }
 
