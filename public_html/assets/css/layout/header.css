@@ -21,7 +21,7 @@
 .brand-mark span:nth-child(3) { height: 18px; background: var(--res-dot); }
 .header-link { font-size: var(--fs-sm); color: var(--ink-2); text-decoration: none; padding: .6rem 0; }
 .header-link:hover { color: var(--ink); text-decoration: underline; }
-.session-box { display: flex; align-items: center; gap: var(--space-3); }
+.session-box { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2) var(--space-4); }
 .session-user { font-size: var(--fs-sm); color: var(--ink-2); }
 .inline-form { margin: 0; }
 /* Mobile: una sola línea; el nombre del admin se omite (el botón de salir alcanza). */

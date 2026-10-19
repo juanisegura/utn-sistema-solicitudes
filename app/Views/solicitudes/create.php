@@ -3,6 +3,7 @@
  * @var array<string, string> $old    valores previos (re-render tras 422)
  * @var array<string, string> $errors mensajes por campo
  * @var array<string, string> $labels
+ * @var string|null           $aviso  mensaje general (429 por exceso de envíos)
  */
 use App\Core\Csrf;
 
@@ -25,6 +26,12 @@ $actual = null;
     <section class="split-main" aria-labelledby="titulo-form">
         <h2 id="titulo-form" class="section-title">Nueva solicitud</h2>
         <p class="hint">Todos los campos son obligatorios.</p>
+
+        <?php if (($aviso ?? null) !== null): ?>
+            <div class="alert alert-error" role="alert">
+                <p><?= e($aviso) ?></p>
+            </div>
+        <?php endif; ?>
 
         <?php if ($errors !== []): ?>
             <div class="alert alert-error" role="alert">
@@ -60,6 +67,12 @@ $actual = null;
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
+
+            <?php /* Honeypot (F-1): fuera de la vista y del orden de tabulación; una persona no lo completa. */ ?>
+            <div class="hp" aria-hidden="true">
+                <label for="campo-sitio-web">No completar este campo</label>
+                <input id="campo-sitio-web" name="sitio_web" type="text" value="" tabindex="-1" autocomplete="off">
+            </div>
 
             <div class="form-actions field-full">
                 <button type="submit" class="btn btn-primary">Enviar solicitud</button>

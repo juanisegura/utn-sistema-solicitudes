@@ -7,7 +7,9 @@
  * @var string|null               $title
  * @var array<string, mixed>|null $admin
  */
+use App\Controllers\Admin\CuentaController;
 use App\Core\Csrf;
+use App\Core\Session;
 
 // Hojas en orden de cascada: tokens → reset → global → layout → componentes → páginas (sin @import).
 $hojas = [
@@ -36,6 +38,7 @@ $hojas = [
             <?php if (!empty($admin)): ?>
                 <div class="session-box">
                     <span class="session-user"><?= e($admin['nombre']) ?></span>
+                    <a class="header-link" href="/admin/cuenta/password">Cambiar contraseña</a>
                     <form method="post" action="/admin/logout" class="inline-form">
                         <?= Csrf::field() ?>
                         <button type="submit" class="btn btn-quiet">Cerrar sesión</button>
@@ -47,6 +50,11 @@ $hojas = [
         </div>
     </header>
     <main id="contenido" class="wrap page">
+        <?php /* Aviso de una acción de cuenta tras el redirect (F-5: "Contraseña actualizada."). */ ?>
+        <?php $avisoPanel = !empty($admin) ? Session::pullFlash(CuentaController::FLASH_PANEL) : null; ?>
+        <?php if (is_string($avisoPanel)): ?>
+            <div class="alert alert-success" role="status"><p><?= e($avisoPanel) ?></p></div>
+        <?php endif; ?>
         <?= $content /* ya escapado en la vista; escaparlo de nuevo mostraría el HTML como texto */ ?>
     </main>
     <footer class="site-footer">

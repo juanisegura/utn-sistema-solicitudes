@@ -10,6 +10,8 @@ use App\Models\Admin;
 final class Auth
 {
     private const SESSION_KEY = 'admin_id';
+    /** Instante del login (o del último cambio de contraseña de esta sesión), reloj de la DB. */
+    private const AUTH_AT = 'auth_at';
 
     /**
      * Hash bcrypt de un valor aleatorio descartado, con el mismo algoritmo y costo que
@@ -43,7 +45,7 @@ final class Auth
         $id = (int) $admin['id'];
         // Efectos en la DB antes de fijar la sesión (D-53): si alguno falla, la request termina en
         // 500 sin dejar una sesión autenticada a medias.
-        Admin::touchLastLogin($id);
+        $authAt = Admin::touchLastLogin($id);
         if (Admin::needsRehash($hash)) {
             Admin::updatePasswordHash($id, $password);
         }
@@ -51,6 +53,7 @@ final class Auth
         // El admin_id se escribe último: es lo que vuelve autenticada a la sesión.
         Session::regenerate();
         Csrf::rotate();
+        Session::set(self::AUTH_AT, $authAt);
         Session::set(self::SESSION_KEY, $id);
 
         return true;
@@ -77,8 +80,39 @@ final class Auth
 
             return null;
         }
+        // F-5: una sesión iniciada antes del último cambio de contraseña ya no vale (la que hizo el
+        // cambio actualizó su auth_at). Ambos instantes vienen de NOW(6): comparables como texto.
+        $cambio = $admin['password_changed_at'];
+        $authAt = Session::get(self::AUTH_AT);
+        if ($cambio !== null && (!is_string($authAt) || strcmp($authAt, (string) $cambio) < 0)) {
+            SecurityLog::evento('sesion_invalidada', '', $id);
+            self::logout();
+
+            return null;
+        }
 
         return self::$current = $admin;
+    }
+
+    /** Contraseña actual del admin (F-5). Las inaceptables (>72 bytes, NUL) nunca coinciden. */
+    public static function passwordActualValida(int $id, #[\SensitiveParameter] string $password): bool
+    {
+        $hash = Admin::passwordHash($id);
+
+        return $hash !== null && Admin::passwordAcceptable($password) && password_verify($password, $hash);
+    }
+
+    /**
+     * Cambia la contraseña del admin logueado (F-5): las demás sesiones quedan invalidadas y esta
+     * sigue, con ID de sesión y token CSRF nuevos y auth_at igual al instante del cambio.
+     */
+    public static function cambiarPassword(int $id, #[\SensitiveParameter] string $nueva): void
+    {
+        $cambio = Admin::cambiarPassword($id, $nueva);
+        Session::regenerate();
+        Csrf::rotate();
+        Session::set(self::AUTH_AT, $cambio);
+        self::$current = null;
     }
 
     /** Guardia de las rutas 'auth'. Sin sesión: GET → login; POST → 401 sin ejecutar nada (D-17). */
@@ -87,7 +121,9 @@ final class Auth
         if (self::user() !== null) {
             return;
         }
-        if (Request::method() === 'GET' || Request::method() === 'HEAD') {
+        $esLectura = Request::method() === 'GET' || Request::method() === 'HEAD';
+        SecurityLog::evento('acceso_sin_sesion', $esLectura ? '302' : '401');
+        if ($esLectura) {
             Response::redirect('/admin/login');
         }
         Response::abort(401);

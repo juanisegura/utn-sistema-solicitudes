@@ -64,17 +64,41 @@ final class Admin
     }
 
     /**
-     * Para re-verificar en cada request admin que la cuenta siga existiendo y activa.
-     * No devuelve el hash: no hace falta fuera del login.
+     * Para re-verificar en cada request admin que la cuenta siga existiendo y activa, y que la
+     * sesión sea posterior al último cambio de contraseña (F-5). No devuelve el hash.
      *
      * @return array<string, mixed>|null
      */
     public static function find(int $id): ?array
     {
         return Database::fetchOne(
-            'SELECT id, nombre, email, activo, last_login_at FROM admins WHERE id = ?',
+            'SELECT id, nombre, email, activo, last_login_at, password_changed_at FROM admins WHERE id = ?',
             [$id]
         );
+    }
+
+    /** Hash guardado, para verificar la contraseña actual al cambiarla (F-5). */
+    public static function passwordHash(int $id): ?string
+    {
+        $fila = Database::fetchOne('SELECT password_hash FROM admins WHERE id = ?', [$id]);
+
+        return $fila === null ? null : (string) $fila['password_hash'];
+    }
+
+    /**
+     * Cambio de contraseña pedido por el admin (F-5): nuevo hash y password_changed_at = NOW(6).
+     * Devuelve ese instante (con microsegundos, reloj de la DB): las sesiones con auth_at anterior
+     * quedan invalidadas. El rehash automático del login usa updatePasswordHash(), que no invalida.
+     */
+    public static function cambiarPassword(int $id, #[\SensitiveParameter] string $password): string
+    {
+        $ahora = self::ahora();
+        Database::execute(
+            'UPDATE admins SET password_hash = ?, password_changed_at = ? WHERE id = ?',
+            [self::hash($password), $ahora, $id]
+        );
+
+        return $ahora;
     }
 
     /** Hashea acá para que ningún llamador pueda guardar la password en claro por error. */
@@ -97,9 +121,23 @@ final class Admin
         );
     }
 
-    public static function touchLastLogin(int $id): void
+    /**
+     * Registra el login y devuelve su instante (NOW(6), reloj de la DB), que la sesión guarda como
+     * auth_at para compararlo con password_changed_at sin mezclar relojes ni perder el orden
+     * dentro del mismo segundo (F-5).
+     */
+    public static function touchLastLogin(int $id): string
     {
-        Database::execute('UPDATE admins SET last_login_at = NOW() WHERE id = ?', [$id]);
+        $ahora = self::ahora();
+        Database::execute('UPDATE admins SET last_login_at = ? WHERE id = ?', [substr($ahora, 0, 19), $id]);
+
+        return $ahora;
+    }
+
+    /** "AAAA-MM-DD HH:MM:SS.uuuuuu" de la DB: mismo formato que password_changed_at (comparable como texto). */
+    private static function ahora(): string
+    {
+        return (string) Database::fetchOne('SELECT NOW(6) AS ahora')['ahora'];
     }
 
     private static function hash(#[\SensitiveParameter] string $password): string

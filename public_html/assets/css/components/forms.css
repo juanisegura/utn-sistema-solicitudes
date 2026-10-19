@@ -26,3 +26,7 @@
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field-full { grid-column: 1 / -1; }
 }
+
+/* Honeypot (F-1): fuera de la pantalla, no display:none (algunos bots lo detectan); el contenedor
+   tiene aria-hidden y el campo tabindex=-1, así no llega a lectores ni al teclado. */
+.hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }

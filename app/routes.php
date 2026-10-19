@@ -6,6 +6,7 @@ declare(strict_types=1);
 // por defecto en el Router (se puede desactivar con 'csrf' => false, hoy ninguna lo hace).
 
 use App\Controllers\Admin\AuthController;
+use App\Controllers\Admin\CuentaController;
 use App\Controllers\Admin\SolicitudAdminController;
 use App\Controllers\SolicitudController;
 
@@ -20,4 +21,6 @@ return [
     ['GET',  '/admin',                         [SolicitudAdminController::class, 'index'], ['auth' => true]],
     ['GET',  '/admin/solicitudes/{id}',        [SolicitudAdminController::class, 'show'], ['auth' => true]],
     ['POST', '/admin/solicitudes/{id}/estado', [SolicitudAdminController::class, 'updateEstado'], ['auth' => true]],
+    ['GET',  '/admin/cuenta/password',         [CuentaController::class, 'showPassword'], ['auth' => true]],
+    ['POST', '/admin/cuenta/password',         [CuentaController::class, 'cambiarPassword'], ['auth' => true]],
 ];

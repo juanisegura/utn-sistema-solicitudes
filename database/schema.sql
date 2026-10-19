@@ -7,6 +7,7 @@ SET NAMES utf8mb4;
 -- solicitud_eventos primero: referencia a solicitudes y admins.
 DROP TABLE IF EXISTS solicitud_eventos;
 DROP TABLE IF EXISTS login_intentos;
+DROP TABLE IF EXISTS envios_publicos;
 DROP TABLE IF EXISTS solicitudes;
 DROP TABLE IF EXISTS admins;
 
@@ -18,6 +19,9 @@ CREATE TABLE admins (
     password_hash  VARCHAR(255) NOT NULL,
     activo         TINYINT(1)   NOT NULL DEFAULT 1,
     last_login_at  DATETIME     NULL,
+    -- Último cambio de contraseña (F-5); las sesiones iniciadas antes quedan invalidadas.
+    -- Microsegundos: un login y un cambio en el mismo segundo no se confunden.
+    password_changed_at DATETIME(6) NULL,
     created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_admins_email (email)
@@ -71,4 +75,16 @@ CREATE TABLE solicitud_eventos (
     KEY idx_admin (admin_id),
     CONSTRAINT fk_eventos_solicitud FOREIGN KEY (solicitud_id) REFERENCES solicitudes (id) ON DELETE CASCADE,
     CONSTRAINT fk_eventos_admin FOREIGN KEY (admin_id) REFERENCES admins (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Envíos de formularios públicos para el límite de frecuencia por IP (F-1, ADR-0012). Mismo
+-- patrón "reservar y contar" que login_intentos; 'seguimiento' lo usa la consulta pública (F-3).
+CREATE TABLE envios_publicos (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ip          VARCHAR(45)  NOT NULL,
+    accion      ENUM('solicitud','seguimiento') NOT NULL,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_accion_ip (accion, ip, created_at),  -- conteo de la ventana por acción e IP
+    KEY idx_created (created_at)                  -- purga de registros viejos
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

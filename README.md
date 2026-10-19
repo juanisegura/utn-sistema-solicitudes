@@ -13,6 +13,9 @@ límite de intentos de login.
 - Formulario de solicitud (nombre, email, asunto, descripción) con validación server-side
   y mensajes por campo.
 - Confirmación con el número de solicitud y el recorrido de estados (patrón POST → redirect → GET).
+- **Límite de envíos** por IP (5 cada 10 minutos → 429 con `Retry-After`) y un campo trampa
+  (*honeypot*) invisible para personas: si un bot lo completa, recibe una confirmación genérica
+  y no se guarda nada.
 
 **Panel administrativo** (`/admin`)
 - Login y logout de administrador, con **límite de intentos**: 5 fallos por IP + email
@@ -21,7 +24,14 @@ límite de intentos de login.
   o comienzo) en asunto, nombre, email o descripción con índice FULLTEXT, **filtro por estado**,
   **contadores** y **paginación** (20 por página).
 - Detalle con cambio de estado e **historial**: quién lo cambió, cuándo y de qué estado a cuál.
+- **Cambio de contraseña** (`/admin/cuenta/password`): pide la actual (sus fallos cuentan en el
+  límite de login), exige 12 caracteres o más y cierra las demás sesiones abiertas de esa cuenta.
 - Todas las páginas y operaciones del panel exigen sesión de administrador.
+
+**Registro de seguridad**: logins correctos, fallidos y bloqueados, CSRF inválido, accesos al
+panel sin sesión, envíos bloqueados, honeypot y cambios de contraseña quedan en
+`storage/logs/security.log` (con la misma rotación que el log de errores). Nunca se registran
+contraseñas, cuerpos ni query strings; el email aparece solo como un prefijo de su SHA-256.
 
 ## Requisitos
 
@@ -104,6 +114,12 @@ defaults están en `app/config/config.php`. Al arrancar, `App\Core\Config` valid
 rechaza una configuración inválida (error en el log y página 500 genérica). Con `env => 'production'`,
 `debug` queda siempre en `false`.
 
+Para pruebas se puede cargar otro archivo de configuración local con la variable de entorno
+`APP_CONFIG_LOCAL` (ruta absoluta a un PHP que devuelva el mismo array; si no existe o no se puede
+leer, la app no arranca). `tests/run-all.sh` la usa para levantar su servidor con un límite de
+envíos más alto, porque una corrida del smoke hace unos 35 envíos desde la misma IP. En
+producción no hace falta definirla.
+
 | Clave (`app.…`) | Default | Válido | Para qué |
 |---|---|---|---|
 | `session_timeout` | `1800` | entero ≥ 60 | Segundos de inactividad antes de vaciar la sesión |
@@ -114,6 +130,8 @@ rechaza una configuración inválida (error en el log y página 500 genérica). 
 | `log_max_bytes` | `1048576` | entero ≥ 1024 | Tamaño a partir del cual rota `storage/logs/app.log` |
 | `log_max_archivos` | `5` | entero 1–50 | Archivos viejos del log que se conservan |
 | `por_pagina` | `20` | entero 1–100 | Solicitudes por página en el panel |
+| `form_max_por_ip` | `5` | entero ≥ 1 | Envíos del formulario público por IP en la ventana |
+| `form_ventana_seg` | `600` | entero ≥ 1 | Ventana del límite de envíos, en segundos |
 
 ## Apache
 

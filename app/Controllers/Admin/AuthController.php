@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Controllers\Admin;
 
 use App\Core\Auth;
+use App\Core\FormThrottle;
 use App\Core\LoginThrottle;
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\SecurityLog;
 use App\Core\View;
 
 /** Login / logout del administrador (F4). */
@@ -35,10 +37,10 @@ final class AuthController
         // concurrencia). Bloqueado → ni se verifica la password ni se consulta admins.
         [$intento, $espera] = LoginThrottle::reservar($ip, $email);
         if ($intento === null) {
-            $minutos = (int) ceil($espera / 60);
+            SecurityLog::evento('login_bloqueado', 'email=' . SecurityLog::emailRef($email) . ' retry=' . $espera);
             $this->renderLogin(
                 $email,
-                'Demasiados intentos. Probá de nuevo en ' . $minutos . ($minutos === 1 ? ' minuto.' : ' minutos.'),
+                'Demasiados intentos. Probá de nuevo en ' . FormThrottle::minutos($espera) . '.',
                 429,
                 ['Retry-After' => (string) $espera]
             );
@@ -55,11 +57,13 @@ final class AuthController
                 Auth::logout();
                 throw $e;
             }
+            SecurityLog::evento('login_ok', 'email=' . SecurityLog::emailRef($email));
             Response::redirect('/admin');
         }
 
         // Todo fallo cuenta (también >72 bytes, NUL o email no UTF-8): la fila reservada queda.
         LoginThrottle::fallo();
+        SecurityLog::evento('login_fallido', 'email=' . SecurityLog::emailRef($email));
         // Mismo mensaje para email inexistente, password errónea o admin inactivo.
         $this->renderLogin($email, 'Email o contraseña incorrectos.', 401);
     }

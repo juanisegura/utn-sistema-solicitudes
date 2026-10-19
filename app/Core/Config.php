@@ -26,6 +26,10 @@ final class Config
         'log_max_bytes'        => [1024, null],
         'log_max_archivos'     => [1, 50],
         'por_pagina'           => [1, 100],
+        'form_max_por_ip'         => [1, null],
+        'form_ventana_seg'        => [1, null],
+        'seguimiento_max_por_ip'  => [1, null],
+        'seguimiento_ventana_seg' => [1, null],
     ];
 
     /** @var array<string, mixed>|null */

@@ -15,7 +15,7 @@ if (PHP_SAPI !== 'cli') {
 
 use App\Core\Database;
 
-const TABLAS = ['admins', 'solicitudes', 'solicitud_eventos', 'login_intentos'];
+const TABLAS = ['admins', 'solicitudes', 'solicitud_eventos', 'login_intentos', 'envios_publicos'];
 
 /**
  * Parte un archivo .sql en sentencias. Alcanza para nuestros archivos: comentarios de

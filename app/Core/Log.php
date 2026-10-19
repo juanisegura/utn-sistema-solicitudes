@@ -23,14 +23,22 @@ final class Log
     }
 
     /**
-     * Agrega la línea (+ "\n"). Si el archivo ya supera maxBytes, antes rota: .N-1 → .N … .1 → .2,
+     * Agrega la línea (+ "\n") al canal: 'app' (el archivo configurado) u otro nombre, que se
+     * escribe en "<directorio del log de app>/<canal>.log" con la misma rotación (F-2: 'security').
+     * Si el archivo ya supera maxBytes, antes rota: .N-1 → .N … .1 → .2,
      * actual → .1, y el más viejo (.N) se descarta. Un lock en "<archivo>.lock" (no en el log, que
      * se renombra) serializa rotación y escritura entre requests simultáneas. Si no se puede
      * escribir, la línea va al log del servidor (error_log) para no perderla.
      */
-    public static function write(string $line): void
+    public static function write(string $line, string $canal = 'app'): void
     {
         $file = self::$file ?? dirname(__DIR__, 2) . '/storage/logs/app.log';
+        if ($canal !== 'app') {
+            if (preg_match('/^[a-z][a-z0-9_-]{0,30}$/D', $canal) !== 1) {
+                throw new \InvalidArgumentException('Nombre de canal de log inválido.');
+            }
+            $file = dirname($file) . '/' . $canal . '.log';
+        }
         $line = rtrim($line, "\n") . "\n";
         $lock = @fopen($file . '.lock', 'c');
         if ($lock === false || !flock($lock, LOCK_EX)) {

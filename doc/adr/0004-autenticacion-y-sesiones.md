@@ -91,3 +91,24 @@ eso.
 La sesión no se abre en el arranque sino en el Router, después de resolver ruta y método y
 antes de autenticación y CSRF: las respuestas 404 y 405 y los archivos estáticos no crean
 sesión ni envían `Set-Cookie`. Cierra la limitación D-32.
+
+## Revisión posterior: cambio de contraseña (F-5)
+
+El panel permite al admin cambiar su contraseña en `/admin/cuenta/password` (auth + CSRF):
+
+- Pide la actual, verificada con `password_verify`. Sus fallos cuentan en el límite de
+  login de esa cuenta (IP + email, ADR-0009), así el formulario no sirve para probar
+  contraseñas sin límite.
+- La nueva debe tener 12 caracteres o más, cumplir `Admin::passwordAcceptable` (≤ 72 bytes,
+  sin NUL), ser distinta de la actual y coincidir con la confirmación. Errores → 422 por
+  campo, sin re-mostrar contraseñas.
+- Al cambiarla se guarda `admins.password_changed_at` (DATETIME(6), `NOW(6)`). Cada sesión
+  guarda `auth_at`, el instante de su login (también `NOW(6)`, reloj de la DB).
+  `Auth::user()` rechaza toda sesión con `auth_at` anterior al último cambio: la cierra y
+  registra `sesion_invalidada`. La sesión que hizo el cambio regenera su ID, rota el token
+  CSRF y actualiza su `auth_at`, así que sigue activa.
+- Los microsegundos y el reloj único (la DB) evitan que un login y un cambio en el mismo
+  segundo, o la diferencia de reloj entre PHP y la DB, dejen viva una sesión que debía
+  cerrarse.
+- El rehash automático al loguear (`password_needs_rehash`) **no** actualiza
+  `password_changed_at`: un cambio de algoritmo o costo no debe cerrar sesiones.

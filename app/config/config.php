@@ -23,6 +23,11 @@ $defaults = [
         'log_max_archivos' => 5,
         // Solicitudes por página en el listado del panel (M-3).
         'por_pagina' => 20,
+        // Límite de frecuencia de formularios públicos por IP (F-1, ADR-0012).
+        'form_max_por_ip'         => 5,    // envíos de solicitudes en la ventana
+        'form_ventana_seg'        => 600,
+        'seguimiento_max_por_ip'  => 10,   // consultas de seguimiento fallidas en la ventana (F-3)
+        'seguimiento_ventana_seg' => 900,
     ],
     'db' => [
         'host'    => '127.0.0.1',
@@ -34,8 +39,19 @@ $defaults = [
     ],
 ];
 
+// D-64: quien levanta el servidor o corre un script puede apuntar APP_CONFIG_LOCAL a otro archivo
+// PHP (ruta absoluta) que devuelva el mismo array, por ejemplo un overlay de pruebas que hace
+// require de config.local.php y cambia un límite. Si no está definida, se usa config.local.php.
 $localFile = __DIR__ . '/config.local.php';
-if (!is_file($localFile)) {
+$override = getenv('APP_CONFIG_LOCAL');
+if (is_string($override) && $override !== '') {
+    $localFile = $override;
+    if (!str_starts_with($override, '/') || !is_file($override) || !is_readable($override)) {
+        // Sin la ruta en el mensaje: no revela la ubicación en el servidor.
+        throw new RuntimeException('Falta la configuración local: APP_CONFIG_LOCAL no apunta a un archivo legible (ruta absoluta).');
+    }
+}
+if (!is_file($localFile) || !is_readable($localFile)) {
     // Mensaje con ruta relativa al proyecto: no revela la ubicación en el servidor.
     throw new RuntimeException(
         'Falta la configuración local: copiar app/config/config.local.example.php '

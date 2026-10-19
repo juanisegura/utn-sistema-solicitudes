@@ -45,6 +45,7 @@ final class Router
         }
         // Seguro por defecto: todo POST valida CSRF salvo que la ruta lo desactive explícitamente.
         if (($options['csrf'] ?? $verb === 'POST') && !Csrf::verify(Request::input(Csrf::FIELD))) {
+            SecurityLog::evento('csrf_invalido');
             Response::abort(419);
         }
     }
